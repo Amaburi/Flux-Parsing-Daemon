@@ -533,31 +533,23 @@ LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
 
 - [ ] **Step 2: Write the manifest and build script**
 
-`crates/fingerprint-terms/Cargo.toml`:
+Add dependencies with `cargo add`, not by hand. The root workspace manifest carries no
+`[workspace.dependencies]` table — with only two crates it buys little, and per-crate
+`cargo add` writes correctly resolved versions instead of guessed ones. If a third crate
+arrives and versions start drifting, hoist then.
 
-```toml
-[package]
-name = "fingerprint-terms"
-version = "0.1.0"
-edition.workspace = true
-rust-version.workspace = true
-publish = false
-
-[dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
-hmac = { workspace = true }
-directories = { workspace = true }
-time = { workspace = true }
-thiserror = { workspace = true }
-
-[build-dependencies]
-sha2 = { workspace = true }
-
-[dev-dependencies]
-tempfile = "3"
+```bash
+cd crates/fingerprint-terms
+cargo add serde --features derive
+cargo add serde_json sha2 hmac directories thiserror
+cargo add time --features formatting,parsing
+cargo add --build sha2
+cargo add --dev tempfile
 ```
+
+Resolved at time of execution: `directories 6.0.0`, `hmac 0.12.1`, `serde 1.0.229`,
+`serde_json 1.0.151`, `sha2 0.10.9`, `thiserror 2.0.20`, `time 0.3.44`,
+`tempfile 3.27.0`.
 
 `crates/fingerprint-terms/build.rs`:
 
