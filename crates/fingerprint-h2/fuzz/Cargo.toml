@@ -1,0 +1,23 @@
+[package]
+name = "fingerprint-h2-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.fingerprint-h2]
+path = ".."
+
+[[bin]]
+name = "parse_preamble"
+path = "fuzz_targets/parse_preamble.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
