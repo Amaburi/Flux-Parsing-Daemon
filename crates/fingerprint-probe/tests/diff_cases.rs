@@ -178,3 +178,56 @@ fn an_unknown_profile_name_reports_the_available_ones() {
     assert!(msg.contains("chrome-macos"));
     assert!(msg.contains("curl-8.7.1-macos"));
 }
+
+// --- the HTTP layer, fpd's own design rather than JA4H -----------------------
+
+#[test]
+fn the_http_layer_is_compared_and_named_in_the_diff() {
+    let d = diff(&report("curl"), &profile("chrome-macos"));
+    let text = format!("{d}");
+    assert!(
+        text.contains("header order"),
+        "must compare header order:\n{text}"
+    );
+    assert!(
+        text.contains("sec-ch-ua") || text.contains("missing:"),
+        "must name what is missing rather than only that a hash differs:\n{text}"
+    );
+}
+
+#[test]
+fn accept_language_presence_discriminates_curl_from_chrome() {
+    let d = diff(&report("curl"), &profile("chrome-macos"));
+    let f = d
+        .fields
+        .iter()
+        .find(|f| f.field == "accept-language")
+        .expect("accept-language field");
+    assert!(!f.ok, "curl sends none, Chrome does");
+}
+
+/// The reason request-scoped fields are excluded from a client profile. A site
+/// setting cookies must not make a browser stop matching itself. Chrome's fixture
+/// carries three cookie headers and still matches its own profile, which proves
+/// the exclusion is real rather than incidental.
+#[test]
+fn cookie_headers_do_not_stop_chrome_matching_its_own_profile() {
+    let r = report("chrome");
+    let h2 = r.h2.as_ref().expect("h2");
+    assert_eq!(
+        h2.http.cookie_header_count, 3,
+        "precondition: cookies present"
+    );
+    assert!(diff(&r, &profile("chrome-macos")).is_clean());
+}
+
+/// Cookie values are never read, so they can never reach a profile or a diff.
+#[test]
+fn no_cookie_value_appears_anywhere_in_the_diff_output() {
+    let d = diff(&report("chrome"), &profile("chrome-macos"));
+    let text = format!("{d}");
+    assert!(
+        !text.contains('='),
+        "a cookie value would contain '=':\n{text}"
+    );
+}

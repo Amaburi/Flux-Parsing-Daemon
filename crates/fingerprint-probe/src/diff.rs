@@ -96,6 +96,10 @@ impl fmt::Display for Diff {
     }
 }
 
+fn join_refs(v: &[&String]) -> String {
+    v.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",")
+}
+
 fn list(v: &[u16]) -> String {
     v.iter()
         .map(|x| x.to_string())
@@ -263,6 +267,51 @@ pub fn diff(report: &ClientReport, profile: &Profile) -> Diff {
             "expected".into(),
         )),
         _ => {}
+    }
+
+    // --- HTTP layer ----------------------------------------------------------
+    // fpd's own design, not JA4H. Only client-identifying fields are compared;
+    // method, referer and cookie counts vary between requests from one client and
+    // would make a browser fail to match its own profile.
+    if let (Some(obs), Some(exp)) = (&report.h2, &profile.http) {
+        let obs_headers = obs.http.comparable_headers();
+        let ok = obs_headers == exp.header_names;
+        let mut d = field(
+            "header order",
+            ok,
+            format!("{} headers", obs_headers.len()),
+            format!("{} headers", exp.header_names.len()),
+        );
+        if !ok {
+            d.observed = obs_headers.join(",");
+            d.expected = exp.header_names.join(",");
+            let missing: Vec<&String> = exp
+                .header_names
+                .iter()
+                .filter(|h| !obs_headers.contains(h))
+                .collect();
+            if !missing.is_empty() {
+                d.note = Some(format!("missing: {}", join_refs(&missing)));
+            }
+        }
+        fields.push(d);
+
+        fields.push(field(
+            "accept-language",
+            obs.http.has_accept_language == exp.has_accept_language,
+            if obs.http.has_accept_language {
+                "present"
+            } else {
+                "absent"
+            }
+            .into(),
+            if exp.has_accept_language {
+                "present"
+            } else {
+                "absent"
+            }
+            .into(),
+        ));
     }
 
     Diff {

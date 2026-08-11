@@ -91,5 +91,13 @@
     ],
     "window_update": 1048510465,
     "pseudo_order": "m,s,a,p"
+  },
+  "http": {
+    "header_names": [
+      "user-agent",
+      "accept"
+    ],
+    "header_count": 2,
+    "has_accept_language": false
   }
 }

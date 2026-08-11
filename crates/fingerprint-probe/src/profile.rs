@@ -54,6 +54,19 @@ pub struct H2Profile {
     pub pseudo_order: String,
 }
 
+/// The HTTP layer, stored as comparable fields rather than a hash.
+///
+/// Only client-identifying fields are kept. Method, referer and cookie counts are
+/// request scoped, so storing them in a *client* profile would make the same
+/// browser fail to match itself on a different page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HttpProfileStored {
+    /// Request-scoped headers already removed.
+    pub header_names: Vec<String>,
+    pub header_count: usize,
+    pub has_accept_language: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub label: String,
@@ -68,6 +81,8 @@ pub struct Profile {
     pub tls: TlsProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub h2: Option<H2Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http: Option<HttpProfileStored>,
 }
 
 /// `pre_shared_key`. Present only when resuming, so its presence or absence is not
@@ -105,6 +120,11 @@ impl Profile {
                 alpn: tls.alpn.clone(),
                 has_sni: tls.has_sni,
             },
+            http: report.h2.as_ref().map(|h| HttpProfileStored {
+                header_names: h.http.comparable_headers(),
+                header_count: h.http.header_count,
+                has_accept_language: h.http.has_accept_language,
+            }),
             h2: report.h2.as_ref().map(|h| H2Profile {
                 akamai: h.akamai.clone(),
                 settings: h.settings.clone(),

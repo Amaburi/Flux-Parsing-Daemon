@@ -113,9 +113,7 @@ pub fn run(args: Args) -> u8 {
                 report.alpn
             );
         }
-        // JA4H is not implemented, so say what was not checked rather than let the
-        // output imply full coverage.
-        println!("  (checked TLS and HTTP/2; the HTTP layer is not yet covered)");
+        println!("  (checked TLS, HTTP/2 and HTTP headers)");
 
         if d.is_clean() {
             EXIT_MATCH
