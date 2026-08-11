@@ -17,12 +17,49 @@ In development. What works today:
 |---|---|
 | `fingerprint-terms` | Done. Terms gate on every invocation, HMAC acceptance record. |
 | `fingerprint-core` | Done. ClientHello parsing, JA3, JA4, GREASE handling. |
-| `fingerprint-h2` | In progress. HTTP/2 frame walk, HPACK, Akamai fingerprint. |
-| `serve` `tui` `check` `capture` `emulate` | Not implemented. Stubs. |
+| `fingerprint-h2` | Done. Frame walk, HPACK, Akamai fingerprint. |
+| `fingerprint-probe` | Done. Capture probe, profile database, diff engine. |
+| `fpd check` | **Working.** |
+| `fpd capture` | Working. Infers field ordering from repeat samples. |
+| `serve` `tui` `emulate` | Not implemented. Stubs. |
 
-92 tests pass. Every fingerprint value is checked against tshark rather than against
-itself. See [the design](docs/design/2026-08-11-fpd-design.md) and
-[the plans](docs/plans/).
+164 tests pass. Every fingerprint value is checked against tshark rather than against
+itself. The HTTP layer (JA4H) is not implemented, because the specification could not be
+obtained in full and no local oracle exists for it. See
+[the design](docs/design/2026-08-11-fpd-design.md) and [the plans](docs/plans/).
+
+## Try it
+
+```console
+$ fpd terms accept
+$ fpd check --profile chrome-macos -- curl -sk --http2 '{url}'
+```
+
+```
+  ✗ ciphers         4867,4866,4865,…  (chrome-macos: 4865,4866,4867,…)  order rule: Fixed
+  ✗ extensions      43,51,11,10,13,16  (chrome-macos: 23,27,45,…)  order rule: Permuted
+  ✗ GREASE          0 cipher, 0 extension  (chrome-macos: 1 cipher, 2 extension)
+                    absent entirely; no browser omits GREASE
+  ✓ ALPN            h2
+  ✓ SNI             absent
+  ✗ SETTINGS        3:100;4:10485760;2:0  (chrome-macos: 1:65536;2:0;4:6291456;6:262144)
+                    sends id 3, which no browser does
+  ✗ WINDOW_UPDATE   1048510465  (chrome-macos: 15663105)
+  ✗ pseudo-header   m,s,a,p  (chrome-macos: m,a,s,p)
+  verdict: NOT chrome-macos (25% match)
+```
+
+`fpd check` starts a probe on loopback, runs your client against it, and diffs what
+arrived against a stored profile. `{url}` is replaced with the probe URL, and
+`$FPD_PROBE_URL` is set in the client's environment. Exit codes are 0 for a match, 1 for
+a mismatch and 2 for an operational failure, so a broken invocation cannot be mistaken
+for a clean result in CI.
+
+Comparison respects per-profile equivalence rules. Chrome permutes its extension order on
+every connection, so a reordering is not a difference, while a reordering of ciphers is,
+because that order is fixed even for Chrome. GREASE values rotate per connection and are
+normalised away, but GREASE going missing entirely is reported, since no browser omits
+it.
 
 ## What makes it different
 
@@ -171,6 +208,7 @@ $ cargo fmt --check
 crates/fingerprint-terms/   embedded terms, signed acceptance record, the gate
 crates/fingerprint-core/    ClientHello parsing, JA3, JA4
 crates/fingerprint-h2/      HTTP/2 frame walk, HPACK, Akamai fingerprint
+crates/fingerprint-probe/   capture probe, profile database, diff engine
 crates/fpd/                 the fpd binary (package: flux-parsing-daemon)
 scripts/bin2pcap.py         wraps a byte fixture in a pcap for tshark
 spikes/                     throwaway risk spikes, excluded from the workspace

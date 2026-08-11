@@ -1,0 +1,4 @@
+=== M3b TDD log: RED output captured before each implementation ===
+
+## Task 1: recording stream
+(written test-first; RecordingStream absent -> cannot find type)
