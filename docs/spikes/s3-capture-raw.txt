@@ -1,0 +1,18 @@
+S3 capture listener on 127.0.0.1:8445
+
+boring client: handshake OK
+
+=== boring output ===
+  ciphers (16): [6682, 4865, 4866, 4867, 49195, 49199, 49196, 49200, 52393, 52392, 49171, 49172, 156, 157, 47, 53]
+  extensions (14): [47802, 0, 23, 65281, 10, 11, 35, 16, 13, 51, 45, 43, 56026, 21]
+
+=== vs captured chrome ===
+  ✓ ciphers        15/15 exact order
+  ✗ extensions     got 12 want 15
+      got:  [0, 10, 11, 13, 16, 21, 23, 35, 43, 45, 51, 65281]
+      want: [5, 10, 11, 13, 16, 18, 23, 27, 35, 43, 45, 51, 17613, 65037, 65281]
+      missing: [5, 18, 27, 17613, 65037]
+      extra:   [0, 21]
+  ✓ GREASE         1 cipher, 2 extension
+
+  S3 VERDICT: PARTIAL — see field diffs above; this list is M5's work queue

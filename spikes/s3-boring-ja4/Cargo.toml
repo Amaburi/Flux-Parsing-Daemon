@@ -1,0 +1,16 @@
+[package]
+name = "s3-boring-ja4"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Throwaway M0 spike. Excluded from the workspace, so it must be self-contained
+# (no `workspace = true` inheritance) and is never compiled by CI.
+
+[dependencies]
+boring = "4.22.0"
+rcgen = "0.14.7"
+rustls = "0.23.43"
+tokio = { version = "1.53.1", features = ["full"] }
+tokio-boring = "4.22.0"
+tokio-rustls = "0.26.4"

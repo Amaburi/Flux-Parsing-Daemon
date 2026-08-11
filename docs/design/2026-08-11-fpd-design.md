@@ -496,6 +496,15 @@ correct for a TLS library. Emulation therefore builds on **BoringSSL** via the `
 crate, which does expose the necessary controls (cipher list ordering, extension
 permutation, GREASE, ALPS). This is the same foundation `rquest` uses.
 
+**Validated in the M0 S3 spike** (`docs/spikes/2026-08-11-m0-findings.md`). Against a
+live-captured Chrome baseline, `boring` 4.22.0 reproduced the cipher list in exact order
+and GREASE placement exactly, with no tuning. Five extensions remained missing, each
+with a confirmed API: `enable_ocsp_stapling` (5), `enable_signed_cert_timestamps` (18),
+`add_certificate_compression_algorithm` (27), `set_enable_ech_grease` (65037), and —
+the only one needing unsafe FFI, since `boring` ships no wrapper —
+`SSL_add_application_settings` for ALPS (17613). Extension permutation per S1 finding 1
+is covered by `set_permute_extensions`.
+
 **The H2 write path needs the same treatment** as the read path: SETTINGS values *and
 order*, WINDOW_UPDATE increment, and pseudo-header order must be controllable, none of
 which stock `h2` permits. A vendored and patched `h2` is therefore required.
@@ -685,6 +694,12 @@ yes/no on each, with scrappy code that is thrown away afterwards.
 | S1 | Can a `RecordingStream` tee raw bytes under `tokio-rustls` and still complete a handshake? | Raw ClientHello recovered; extension order readable | Fall back to a raw TCP pre-read of the first record before handing to rustls |
 | S2 | After manually consuming preface + SETTINGS + HEADERS, can the connection still be served or proxied? | A replaying stream re-emits consumed bytes; `hyper` serves the request normally | `serve` becomes a frame-level proxy instead of terminating with `hyper` — more work, still viable |
 | S3 | Can `boring` emit a ClientHello whose JA4 equals a captured Chrome JA4? | JA4 strings match | **Emulation descopes to v2.** Inspection-only v1 still ships intact |
+
+**M0 is complete. All three passed** — see `docs/spikes/2026-08-11-m0-findings.md`.
+S1 needed no fallback, S2 confirmed hyper can serve a replayed connection so no
+frame-level proxy is required, and S3 matched cipher order and GREASE placement on the
+first attempt with an enumerable five-extension gap, every item API-addressable.
+**M5 stays in v1** and the descope contingency is not exercised.
 
 S3 is the real risk and the reason it is spiked first rather than trusted. `rquest`
 demonstrates that browser-grade emulation on BoringSSL is achievable, but "achievable"
