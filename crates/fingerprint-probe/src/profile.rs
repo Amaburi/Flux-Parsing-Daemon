@@ -70,6 +70,11 @@ pub struct HttpProfileStored {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub label: String,
+    /// Browser family this profile represents, as one of `crate::ua::Family`'s
+    /// names. Compared against a client's User-Agent claim, so a profile without
+    /// one simply cannot participate in mismatch detection.
+    #[serde(default)]
+    pub family: String,
     pub captured: String,
     pub source: String,
     /// `Some("resumed")` when the capture included `pre_shared_key`, which changes
@@ -103,6 +108,7 @@ impl Profile {
 
         Self {
             label: label.to_string(),
+            family: String::new(),
             captured: captured.to_string(),
             source: "manual".to_string(),
             session,

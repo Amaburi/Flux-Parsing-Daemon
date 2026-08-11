@@ -1,5 +1,6 @@
 {
   "label": "chrome-macos",
+  "family": "chrome",
   "captured": "2026-08-11",
   "source": "m0-spike-fixtures",
   "session": "resumed",
