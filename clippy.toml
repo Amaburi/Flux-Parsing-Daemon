@@ -1,0 +1,12 @@
+# `fingerprint-terms` denies unwrap/expect/panic at the crate root, because it
+# parses attacker-controlled input and a panic there is a denial of service.
+#
+# That reasoning does not extend to test code. A test that panics when its own
+# setup fails is reporting the failure, which is exactly what it should do;
+# forcing tests to handle setup errors gracefully would push them toward
+# swallowing the very errors they exist to surface.
+#
+# So the lints stay denied in production code and are relaxed only under #[cfg(test)].
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

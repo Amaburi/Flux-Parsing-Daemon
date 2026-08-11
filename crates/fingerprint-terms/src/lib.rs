@@ -2,7 +2,9 @@
 
 //! Terms embedding, acceptance records, and the invocation gate for fpd.
 
+pub mod history;
 pub mod record;
+pub mod store;
 
 /// The canonical terms text, compiled into the binary.
 ///
