@@ -1,0 +1,27 @@
+/target
+/spikes/*/target
+
+# OS
+.DS_Store
+
+# Local AI/assistant tooling — never commit, never push
+.claude/
+.claude*
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.mcp.json
+.superpowers/
+.remember/
+.swarm/
+.antigravitycli/
+.cursor/
+.aider*
+.windsurf/
+
+# Local editor/env
+.vscode/
+.idea/
+.env
+.env.*
+!.env.example
