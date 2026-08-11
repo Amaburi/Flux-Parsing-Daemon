@@ -48,8 +48,34 @@ fn main() -> ExitCode {
         },
         Some(cli::Command::Serve) => println!("serve: not yet implemented (M4)"),
         Some(cli::Command::Tui) => println!("tui: not yet implemented (M6)"),
-        Some(cli::Command::Check) => println!("check: not yet implemented (M3)"),
-        Some(cli::Command::Capture) => println!("capture: not yet implemented (M3)"),
+        Some(cli::Command::Check {
+            profile,
+            timeout,
+            cacert_out,
+            command,
+        }) => {
+            let code = commands::check::run(commands::check::Args {
+                profile,
+                timeout_secs: timeout,
+                cacert_out,
+                command,
+            });
+            return ExitCode::from(code);
+        }
+        Some(cli::Command::Capture {
+            label,
+            samples,
+            out,
+            timeout,
+        }) => {
+            let code = commands::capture::run(commands::capture::Args {
+                label,
+                samples,
+                out,
+                timeout_secs: timeout,
+            });
+            return ExitCode::from(code);
+        }
         Some(cli::Command::Emulate) => println!("emulate: not yet implemented (M5)"),
         None => {
             // Unreachable in practice: bare argv is gated above.

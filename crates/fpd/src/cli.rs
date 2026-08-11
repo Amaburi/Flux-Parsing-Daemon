@@ -28,10 +28,37 @@ pub enum Command {
     Serve,
     /// Live fingerprint dashboard  (M6)
     Tui,
-    /// Check a client against a browser profile  (M3)
-    Check,
-    /// Record a browser profile  (M3)
-    Capture,
+    /// Check a client against a browser profile
+    Check {
+        /// Profile to compare against
+        #[arg(long, default_value = "chrome-macos")]
+        profile: String,
+        /// Seconds to wait for the client to connect
+        #[arg(long, default_value_t = 10)]
+        timeout: u64,
+        /// Write the probe certificate here for clients that would rather trust it
+        #[arg(long)]
+        cacert_out: Option<String>,
+        /// The client to run. `{url}` is replaced with the probe URL.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
+    /// Record a browser profile
+    Capture {
+        /// Label for the new profile
+        #[arg(long)]
+        label: String,
+        /// How many handshakes to observe. More than one is required to tell a
+        /// fixed field order from a permuted one.
+        #[arg(long, default_value_t = 1)]
+        samples: usize,
+        /// Directory to write the profile into
+        #[arg(long, default_value = ".")]
+        out: String,
+        /// Seconds to wait for each connection
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
     /// Emulate a captured profile  (M5)
     Emulate,
 }
