@@ -1,10 +1,10 @@
-# fpd — Flux Parsing Daemon
+# FPD(Flux Parsing Daemon)
 
 **TLS/HTTP-2 fingerprint inspection and verified emulation.**
 
 When a request is blocked by a WAF, you get a bare 403 and no reason. Was it your IP,
 your TLS fingerprint, your HTTP/2 framing, or a JavaScript challenge? Today the only way
-to find out is live experimentation against the real target — slow, unreproducible, and
+to find out is live experimentation against the real target slow, unreproducible, and
 it burns the source IP's reputation as a side effect of the debugging itself.
 
 fpd makes the byte-level identity of a client visible, in both directions.
@@ -19,8 +19,8 @@ fpd makes the byte-level identity of a client visible, in both directions.
 
 ## What makes it different
 
-Browser-emulation clients already exist — `curl-impersonate`, `uTLS`, `curl_cffi`,
-`rquest` — and every one of them asks you to take its emulation on faith. None can
+Browser-emulation clients already exist `curl-impersonate`, `uTLS`, `curl_cffi`,
+`rquest` and every one of them asks you to take its emulation on faith. None can
 answer *"is my ClientHello actually equivalent to Chrome 131 right now, after that
 dependency bump?"*, because the emulator and the ground truth live in different
 projects.
@@ -57,7 +57,7 @@ produce that combination, so the signal needs no tuning by the operator.
 fpd can both measure *and* reproduce client identities. That is dual-use, in the same
 way `uTLS`, `curl-impersonate`, and `nmap` are dual-use, and it is handled explicitly.
 
-**Every invocation is gated on accepting [`TERMS.md`](TERMS.md).** Not just emulation —
+**Every invocation is gated on accepting [`TERMS.md`](TERMS.md).** Not just emulation
 the whole binary:
 
 ```console
@@ -75,7 +75,7 @@ The terms text is compiled into the binary with `include_str!`. It is never read
 disk at runtime, so deleting or editing a `TERMS.md` on your filesystem changes nothing
 about what a built binary displays or what an acceptance is bound to.
 
-**Canonical terms hash** — verify any binary against a genuine build:
+**Canonical terms hash** verify any binary against a genuine build:
 
 ```
 sha256:7084b58c32452f36777b71b33a5fd34ee123e6043fa4cd4ca582b27286c2cb8a
@@ -113,7 +113,7 @@ Stated plainly, because overstating it would be worse than not having it:
 
 A fingerprint is a tracking vector, and fingerprint-plus-IP is PII-adjacent under GDPR.
 
-- Header **values** are never read, logged, or stored — only names, order, and counts.
+- Header **values** are never read, logged, or stored only names, order, and counts.
   Cookie and authorization values never enter the fingerprint path.
 - IP handling is configurable: full, truncated, hashed with a rotating salt, or omitted.
 - Log retention is configurable, and fpd requires no database.
