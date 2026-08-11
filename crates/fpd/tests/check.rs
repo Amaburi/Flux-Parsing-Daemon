@@ -124,8 +124,10 @@ fn an_unknown_profile_lists_the_available_ones() {
         .stderr(predicate::str::contains("chrome-macos"));
 }
 
+/// The output states its own coverage, so a reader is never left assuming more
+/// was checked than actually was.
 #[test]
-fn the_output_states_that_the_http_layer_is_not_covered() {
+fn the_output_states_what_it_covered() {
     if !curl_available() {
         return;
     }
@@ -142,7 +144,9 @@ fn the_output_states_that_the_http_layer_is_not_covered() {
             "{url}",
         ])
         .assert()
-        .stdout(predicate::str::contains("HTTP layer is not yet covered"));
+        .stdout(predicate::str::contains(
+            "checked TLS, HTTP/2 and HTTP headers",
+        ));
 }
 
 #[test]
@@ -169,4 +173,82 @@ fn the_probe_certificate_can_be_exported() {
         .success();
     let pem = std::fs::read_to_string(&cert).expect("cert written");
     assert!(pem.starts_with("-----BEGIN CERTIFICATE-----"));
+}
+
+// --- identification, when no profile is named --------------------------------
+
+#[test]
+fn check_without_a_profile_identifies_the_client() {
+    if !curl_available() {
+        return;
+    }
+    let dir = accepted();
+    fpd(&dir)
+        .args(["check", "--", "curl", "-sk", "--http2", "{url}"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("identified: curl-8.7.1-macos"))
+        .stdout(predicate::str::contains("runner-up:"));
+}
+
+#[test]
+fn check_with_a_profile_still_compares_against_it() {
+    if !curl_available() {
+        return;
+    }
+    let dir = accepted();
+    fpd(&dir)
+        .args([
+            "check",
+            "--profile",
+            "chrome-macos",
+            "--",
+            "curl",
+            "-sk",
+            "--http2",
+            "{url}",
+        ])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("NOT chrome-macos"));
+}
+
+/// The headline feature end to end: curl told to lie about being Chrome.
+#[test]
+fn a_client_lying_about_its_user_agent_is_caught() {
+    if !curl_available() {
+        return;
+    }
+    let dir = accepted();
+    fpd(&dir)
+        .args([
+            "check",
+            "--",
+            "curl",
+            "-sk",
+            "--http2",
+            "-A",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+             (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "{url}",
+        ])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("CLAIM MISMATCH"))
+        .stdout(predicate::str::contains("User-Agent says chrome"))
+        .stdout(predicate::str::contains("fingerprint says curl"));
+}
+
+/// The false-positive guard, end to end. An honest curl must never be flagged.
+#[test]
+fn an_honest_client_is_not_flagged_end_to_end() {
+    if !curl_available() {
+        return;
+    }
+    let dir = accepted();
+    fpd(&dir)
+        .args(["check", "--", "curl", "-sk", "--http2", "{url}"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("CLAIM MISMATCH").not());
 }

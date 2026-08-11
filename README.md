@@ -19,8 +19,9 @@ In development. What works today:
 | `fingerprint-core` | Done. ClientHello parsing, JA3, JA4, GREASE handling. |
 | `fingerprint-h2` | Done. Frame walk, HPACK, Akamai fingerprint. |
 | `fingerprint-probe` | Done. Capture probe, profile database, diff engine. |
-| `fpd check` | **Working.** |
+| `fpd check` | **Working.** Compares against a profile, or identifies the client. |
 | `fpd capture` | Working. Infers field ordering from repeat samples. |
+| Claim mismatch | **Working.** Flags a client whose User-Agent contradicts its fingerprint. |
 | `serve` `tui` `emulate` | Not implemented. Stubs. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
@@ -49,6 +50,29 @@ $ fpd check --profile chrome-macos -- curl -sk --http2 '{url}'
   ✗ accept-language absent  (chrome-macos: present)
   verdict: NOT chrome-macos (20% match)
 ```
+
+Without `--profile` it identifies the client instead of comparing it:
+
+```console
+$ fpd check -- curl -sk --http2 '{url}'
+  identified: curl-8.7.1-macos (100% match)
+  runner-up:  chrome-macos (20%)
+```
+
+And it catches a client whose claim contradicts its fingerprint:
+
+```console
+$ fpd check -- curl -sk --http2 -A 'Mozilla/5.0 ... Chrome/131.0.0.0 Safari/537.36' '{url}'
+  identified: curl-8.7.1-macos (100% match)
+
+  CLAIM MISMATCH: User-Agent says chrome, fingerprint says curl
+  no real browser produces this combination
+```
+
+Mismatch detection declines to report whenever either side is uncertain. No User-Agent,
+an unrecognised one, or a fingerprint matching no profile all produce silence rather than
+a guess. A false flag costs more than a missed one, because an operator who sees one
+wrong flag stops trusting all of them.
 
 `fpd check` starts a probe on loopback, runs your client against it, and diffs what
 arrived against a stored profile. `{url}` is replaced with the probe URL, and
@@ -208,8 +232,13 @@ A binary reporting anything else is not a genuine release.
 A fingerprint is a tracking vector, and a fingerprint together with an IP is close
 enough to personal data to be treated as such.
 
-- Header values are never read, logged or stored. Only names, order and counts. Cookie
-  and authorization values never enter the fingerprint path.
+- Header values are not read, with **one documented exception**. `user-agent` is read,
+  because claim mismatch detection compares what a client says it is against what its
+  fingerprint shows it to be, and the claim lives in that value. Cookie, authorization
+  and every other header value never enter the fingerprint path, and a test enforces
+  that by planting fake secrets and asserting they never reach any output.
+- Cookies are counted, never parsed. HPACK splits a cookie header into several, and the
+  count alone is signal, so no cookie value is ever read.
 - IP handling is configurable. Full, truncated, hashed with a rotating salt, or omitted.
 - Log retention is configurable. fpd requires no database.
 

@@ -30,9 +30,9 @@ pub enum Command {
     Tui,
     /// Check a client against a browser profile
     Check {
-        /// Profile to compare against
-        #[arg(long, default_value = "chrome-macos")]
-        profile: String,
+        /// Profile to compare against. Omit to identify the client instead.
+        #[arg(long)]
+        profile: Option<String>,
         /// Seconds to wait for the client to connect
         #[arg(long, default_value_t = 10)]
         timeout: u64,

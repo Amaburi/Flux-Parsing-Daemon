@@ -5,6 +5,7 @@ use std::time::Duration;
 use fingerprint_probe::diff::diff;
 use fingerprint_probe::probe::Probe;
 use fingerprint_probe::profile::ProfileDb;
+use fingerprint_probe::verdict::identify;
 
 /// Exit codes. A mismatch and a broken invocation must not look the same to CI.
 pub const EXIT_MATCH: u8 = 0;
@@ -12,7 +13,7 @@ pub const EXIT_MISMATCH: u8 = 1;
 pub const EXIT_OPERATIONAL: u8 = 2;
 
 pub struct Args {
-    pub profile: String,
+    pub profile: Option<String>,
     pub timeout_secs: u64,
     pub cacert_out: Option<String>,
     pub command: Vec<String>,
@@ -34,12 +35,16 @@ pub fn run(args: Args) -> u8 {
         }
     };
 
-    let profile = match db.get(&args.profile) {
-        Ok(p) => p.clone(),
-        Err(e) => {
-            eprintln!("fpd: {e}");
-            return EXIT_OPERATIONAL;
-        }
+    // Resolved up front so an unknown name fails before a probe is started.
+    let named = match &args.profile {
+        Some(label) => match db.get(label) {
+            Ok(p) => Some(p.clone()),
+            Err(e) => {
+                eprintln!("fpd: {e}");
+                return EXIT_OPERATIONAL;
+            }
+        },
+        None => None,
     };
 
     let Some((program, rest)) = args.command.split_first() else {
@@ -104,18 +109,69 @@ pub fn run(args: Args) -> u8 {
         let _ = child.kill();
         let _ = child.wait();
 
-        let d = diff(&report, &profile);
-        print!("{d}");
-
-        if report.h2.is_none() && profile.h2.is_some() {
+        if report.h2.is_none() {
             eprintln!(
                 "note: no HTTP/2 preamble captured; ALPN negotiated {:?}",
                 report.alpn
             );
         }
+
+        let clean = match &named {
+            // Compare against the profile the user asked for.
+            Some(profile) => {
+                let d = diff(&report, profile);
+                print!("{d}");
+                d.is_clean()
+            }
+            // No profile named, so say what this client looks like instead.
+            None => {
+                let v = identify(&report, &db);
+                match &v.best {
+                    Some(best) => {
+                        println!(
+                            "  identified: {} ({:.0}% match)",
+                            best.label,
+                            best.score * 100.0
+                        );
+                        if let Some(runner) = v.ranked.get(1) {
+                            println!(
+                                "  runner-up:  {} ({:.0}%)",
+                                runner.label,
+                                runner.score * 100.0
+                            );
+                        }
+                        println!();
+                        print!("{}", best.diff);
+                    }
+                    None => {
+                        println!("  identified: no profile matches this client");
+                        if let Some(closest) = v.ranked.first() {
+                            println!(
+                                "  closest:    {} ({:.0}%)",
+                                closest.label,
+                                closest.score * 100.0
+                            );
+                        }
+                    }
+                }
+
+                if let Some(m) = v.mismatch {
+                    println!();
+                    println!(
+                        "  CLAIM MISMATCH: User-Agent says {}, fingerprint says {}",
+                        m.claimed.as_str(),
+                        m.observed.as_str()
+                    );
+                    println!("  no real browser produces this combination");
+                }
+
+                v.best.is_some() && v.mismatch.is_none()
+            }
+        };
+
         println!("  (checked TLS, HTTP/2 and HTTP headers)");
 
-        if d.is_clean() {
+        if clean {
             EXIT_MATCH
         } else {
             EXIT_MISMATCH
