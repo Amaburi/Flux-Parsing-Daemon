@@ -1,0 +1,3 @@
+=== M2 TDD log — each entry is the RED output captured before implementation ===
+
+## Task 2: reader
