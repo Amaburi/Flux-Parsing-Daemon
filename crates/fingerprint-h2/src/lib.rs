@@ -11,4 +11,5 @@ pub mod akamai;
 pub mod frame;
 pub mod headers;
 pub mod hpack;
+pub mod http;
 pub mod settings;

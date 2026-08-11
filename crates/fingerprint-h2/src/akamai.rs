@@ -21,6 +21,9 @@ pub struct H2Fingerprint {
     pub pseudo_order: String,
     pub headers: Vec<(String, String)>,
     pub akamai: String,
+    /// fpd's own HTTP-layer view. See `crate::http` for why this is a field list
+    /// rather than a hash.
+    pub http: crate::http::HttpProfile,
 }
 
 fn render_settings(pairs: &[(u16, u32)]) -> String {
@@ -73,6 +76,8 @@ pub fn fingerprint(raw: &[u8]) -> Result<H2Fingerprint, H2Error> {
         pseudo_order
     );
 
+    let http = crate::http::HttpProfile::from_headers(&headers);
+
     Ok(H2Fingerprint {
         settings,
         window_update: wu,
@@ -80,6 +85,7 @@ pub fn fingerprint(raw: &[u8]) -> Result<H2Fingerprint, H2Error> {
         pseudo_order,
         headers,
         akamai,
+        http,
     })
 }
 
