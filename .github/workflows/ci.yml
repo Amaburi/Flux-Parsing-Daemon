@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: rustup component add clippy rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Format
+        run: cargo fmt --check
+
+      # `fingerprint-terms` denies unwrap/expect/panic outside tests; this is where
+      # that is enforced. Spikes live outside the workspace and are never built here.
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      # Publishes the canonical terms hash in the job log. Any release binary whose
+      # `fpd terms show --hash` differs from this is not a genuine build.
+      - name: Report canonical terms hash
+        run: |
+          echo "TERMS.md sha256:"
+          sha256sum TERMS.md
+          cargo run --quiet -p flux-parsing-daemon --bin fpd -- terms show --hash

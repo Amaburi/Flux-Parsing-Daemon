@@ -1427,9 +1427,31 @@ displayed by `fpd terms show`.
 This notice must be retained in all copies and derivative works.
 ```
 
-- [ ] **Step 2: Write LICENSE**
+- [ ] **Step 2: Write LICENSE — OUTSTANDING, owner action required**
 
-Place the chosen licence text verbatim. If Elastic License 2.0: copy the canonical text from https://www.elastic.co/licensing/elastic-license, substituting `fpd` as the licensed work and the author's name as licensor. Do not paraphrase licence text.
+**Not written during execution, deliberately.** Licence text is legally operative and
+must be byte-for-byte canonical. Reconstructing it from memory, or retrieving it through
+a summarising fetch that may paraphrase, risks shipping a subtly altered licence — worse
+than shipping none, because a plausible-looking wrong `LICENSE` will not be questioned.
+
+The owner supplies it directly:
+
+```bash
+cd ~/fpd
+curl -fsSL https://raw.githubusercontent.com/elastic/elasticsearch/main/licenses/ELASTIC-LICENSE-2.0.txt -o LICENSE
+```
+
+Verify the retrieved text against https://www.elastic.co/licensing/elastic-license
+before committing; if the raw path has moved, copy from the canonical page instead.
+
+Then record it in both manifests so the licence travels with any publish:
+
+```toml
+# crates/fpd/Cargo.toml and crates/fingerprint-terms/Cargo.toml
+license-file = "../../LICENSE"
+```
+
+Everything else in Task 10 is licence-independent and was completed.
 
 - [ ] **Step 3: Write README.md**
 
