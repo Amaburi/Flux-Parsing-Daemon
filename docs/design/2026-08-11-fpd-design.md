@@ -504,14 +504,39 @@ each other. Each profile therefore carries an explicit equivalence class:
 ```
 
 - `"fixed"` — literal wire order must match exactly (Firefox, Safari, curl).
-- `"permuted"` — the extension *multiset* and GREASE *count* must match exactly, and the
-  derived JA4 must match (JA4 sorts, so it is permutation-invariant), but literal order
-  is free (Chrome and Chromium derivatives).
+- `"permuted"` — the extension *multiset* must match exactly and the derived JA4 must
+  match (JA4 sorts, so it is permutation-invariant), but literal order is free (Chrome
+  and Chromium derivatives).
 
 Getting this wrong in either direction is fatal: compare literally and every Chrome test
 flakes; compare only by JA4 and a genuinely wrong extension set passes. The equivalence
 class is captured as observed evidence, not assumed — `fpd capture --samples 20` records
 repeated handshakes from the same browser and infers whether a field varies.
+
+**Three rules below were derived from ~30 live Chrome handshakes captured during the M0
+S1 spike (`docs/spikes/s1-capture-raw.txt`), not from documentation. Each one would
+otherwise have produced a permanently flaky comparison.**
+
+1. **GREASE *values* rotate every connection; only positions are stable.** Observed
+   cipher[0] taking 2570, 6682, 14906, 19018, 23130, 27242, 35466, 43690, 47802, 51914,
+   56026, 60138, 64250 across successive handshakes. A profile therefore stores GREASE
+   as a **position set plus a count**, never as literal values, and comparison
+   normalises every GREASE value to a single placeholder before matching. Chrome's
+   observed placement is cipher[0], extension[0], and the last non-PSK extension.
+2. **Extension 41 (`pre_shared_key`) is exempt from permutation.** RFC 8446 requires it
+   to be the final extension, and every observed 18-extension handshake ended with it
+   while the other 17 were freely shuffled. A `"permuted"` class must therefore pin 41
+   last rather than treating it as just another member of the multiset.
+3. **Cipher order is `"fixed"` even for Chrome.** Only extension order permutes. Across
+   every sample the 15 non-GREASE ciphers held identical order
+   (`4865, 4866, 4867, 49195, 49199, 49196, 49200, 52393, 52392, 49171, 49172, 156, 157,
+   47, 53`). The two axes are independent and must be modelled separately.
+
+**Extension count varies legitimately between sessions.** The same browser produced both
+17- and 18-extension handshakes — the 18th being `pre_shared_key` on resumption. A
+profile must record which extensions are *session-dependent* or `--samples` will
+oscillate between two "correct" answers. This also means JA4's extension-count digit is
+not stable for a resuming browser, which is a property of JA4 rather than a bug here.
 
 **The verification loop — the headline feature.** Because emitter and parser share the
 profile database, an emulation can be proven rather than assumed:
