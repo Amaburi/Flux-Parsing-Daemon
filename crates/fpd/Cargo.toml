@@ -1,0 +1,21 @@
+[package]
+name = "flux-parsing-daemon"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "fpd — TLS/HTTP-2 fingerprint inspection and verified emulation"
+
+[[bin]]
+name = "fpd"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.61", features = ["derive"] }
+fingerprint-terms = { version = "0.1.0", path = "../fingerprint-terms" }
+
+[dev-dependencies]
+assert_cmd = "2.1.2"
+fingerprint-terms = { path = "../fingerprint-terms" }
+predicates = "3.1.4"
+tempfile = "3.27.0"
