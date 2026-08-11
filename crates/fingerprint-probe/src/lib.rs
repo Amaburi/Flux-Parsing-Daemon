@@ -9,3 +9,5 @@ pub mod diff;
 pub mod probe;
 pub mod profile;
 pub mod recording;
+pub mod ua;
+pub mod verdict;
