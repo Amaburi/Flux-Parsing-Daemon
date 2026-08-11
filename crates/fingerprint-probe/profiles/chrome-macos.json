@@ -1,0 +1,81 @@
+{
+  "label": "chrome-macos",
+  "captured": "2026-08-11",
+  "source": "m0-spike-fixtures",
+  "session": "resumed",
+  "equivalence": {
+    "cipher_order": "fixed",
+    "extension_order": "permuted"
+  },
+  "tls": {
+    "ja4": "t13i1516h2_8daaf6152771_a87ad97598a9",
+    "ciphers": [
+      4865,
+      4866,
+      4867,
+      49195,
+      49199,
+      49196,
+      49200,
+      52393,
+      52392,
+      49171,
+      49172,
+      156,
+      157,
+      47,
+      53
+    ],
+    "extensions": [
+      23,
+      27,
+      45,
+      13,
+      16,
+      18,
+      11,
+      65281,
+      35,
+      51,
+      10,
+      5,
+      43,
+      65037,
+      17613,
+      41
+    ],
+    "grease_cipher_positions": [
+      0
+    ],
+    "grease_ext_positions": [
+      0,
+      16
+    ],
+    "sig_algs": [],
+    "alpn": "h2",
+    "has_sni": false
+  },
+  "h2": {
+    "akamai": "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p",
+    "settings": [
+      [
+        1,
+        65536
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        4,
+        6291456
+      ],
+      [
+        6,
+        262144
+      ]
+    ],
+    "window_update": 15663105,
+    "pseudo_order": "m,a,s,p"
+  }
+}
