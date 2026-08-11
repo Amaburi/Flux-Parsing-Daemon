@@ -1,0 +1,27 @@
+=== M3a TDD log: RED output captured before each implementation ===
+
+## Task 2: frame walk
+error[E0425]: cannot find function `parse_preamble` in this scope
+error[E0425]: cannot find value `PREFACE` in this scope
+
+## Task 3: settings
+error[E0422]: cannot find struct, variant or union type `Priority` in this scope
+error[E0425]: cannot find function `priorities` in this scope
+error[E0425]: cannot find function `settings_pairs` in this scope
+error[E0425]: cannot find function `window_update` in this scope
+
+## Task 4: hpack headers
+error[E0425]: cannot find function `decode_headers` in this scope
+error[E0425]: cannot find function `pseudo_header_order` in this scope
+
+## Task 5: akamai
+error[E0422]: cannot find struct, variant or union type `Priority` in this scope
+error[E0425]: cannot find function `fingerprint` in this scope
+error[E0425]: cannot find function `render_priorities` in this scope
+
+## Task 6: hardening
+property test arbitrary_headers_payloads_never_panic FOUND A REAL PANIC:
+  fluke-hpack-0.3.1/src/decoder.rs:505 -> decode_integer(buf,5).ok().unwrap()
+  called Option::unwrap() on a None value
+  contained via catch_unwind in headers::decode_fragment; all 4 fuzz artifacts verified CONTAINED
+fuzz (frame layer): 8,611,830 runs in 91s, zero crashes

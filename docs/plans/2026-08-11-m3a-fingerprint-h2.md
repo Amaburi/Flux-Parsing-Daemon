@@ -2,6 +2,11 @@
 
 > Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax. Every task ends at a hard stop for review and commit — see the Commit Protocol.
 
+**Status: COMPLETE.** 132 workspace tests pass, clippy `-D warnings` clean, 8,611,830 fuzz
+executions with zero crashes. Both Akamai fingerprints match their tshark-derived oracle.
+A security finding in a dependency came out of this milestone and is recorded at the
+bottom of this document.
+
 **Goal:** Turn the decrypted HTTP/2 connection preamble into an `H2Fingerprint` carrying the Akamai fingerprint string, with every component validated against tshark and the parser hardened against malformed input.
 
 **Architecture:** A new crate `crates/fingerprint-h2`, pure functions over `&[u8]`, mirroring `fingerprint-core`. Byte fixtures of the **decrypted** preamble drive every test. `Reader` is reused from `fingerprint-core` rather than duplicated.
@@ -528,4 +533,90 @@ first milestone with a user-facing command and needs its own plan.
 4. **PRIORITY frames are near-extinct.** Modern Chrome uses RFC 9218 extensible
    priorities rather than PRIORITY frames, so the field will be `0` for most clients and
    the parsing path stays largely untested. Firefox still sends a priority tree and would
-   exercise it — worth capturing when Firefox fixtures arrive.
+   exercise it, worth capturing when Firefox fixtures arrive.
+
+---
+
+## Execution record
+
+Red-phase output for each task is in `m3a-tdd-log.txt`.
+
+### Security finding: remotely triggerable panic in `fluke-hpack` 0.3.1
+
+Found by the `arbitrary_headers_payloads_never_panic` property test in Task 6.
+
+`fluke-hpack-0.3.1/src/decoder.rs:505`, inside `update_max_dynamic_size`, which returns
+`Result`:
+
+```rust
+let (new_size, consumed) = decode_integer(buf, 5).ok().unwrap();
+```
+
+A header block containing a dynamic-table-size-update whose varint does not decode
+panics instead of returning the error the signature promises. It is not limited to a
+malformed leading update: a large block can desync the decoder onto a `001xxxxx` byte
+near the end of the buffer and reach the same call. Minimal triggers include a header
+block of the single byte `0x3f`.
+
+**Why it matters here.** The input is attacker controlled and arrives from the network.
+Once M4 ships `serve`, which terminates TLS in front of a production application, an
+uncontained panic is a per-connection denial of service reachable by anyone.
+
+**Containment.** `headers::decode_fragment` wraps the decoder in `catch_unwind`. This is
+sound because the decoder is constructed inside the closure and dropped on unwind, so no
+partially mutated state escapes. Verified: all four fuzz artifacts degrade to an empty
+header list in a normal build rather than terminating the process.
+
+**Limitations, stated rather than glossed over.**
+
+- It does not help under `panic = "abort"`.
+- The panic message still reaches stderr, so a flood of malformed requests becomes log
+  noise.
+
+**Consequence for the fuzz target.** cargo-fuzz forces `-Cpanic=abort` through RUSTFLAGS,
+which overrides any profile setting, so `catch_unwind` cannot function there. Fuzzing
+through HPACK would only rediscover the upstream bug in a configuration that is never
+shipped. The target therefore covers the frame layer that this crate owns, and HPACK is
+covered by property tests under unwind plus a pinned regression test named
+`the_upstream_hpack_size_update_panic_stays_contained`.
+
+**Recommended before M4.** Report upstream, and either vendor a patched copy replacing
+that `unwrap` or move to a different decoder. Once the dependency no longer panics, the
+`catch_unwind` and the fuzz-target split both disappear.
+
+### Other deviations
+
+1. **A real bug of ours, caught by the oracle.** The first HPACK implementation fed the
+   whole HEADERS payload to the decoder. That works for curl (`flags=0x05`) and fails for
+   Chrome (`flags=0x25`), because the PRIORITY flag prepends five bytes before the header
+   block. Fixed by `header_block_fragment`, which also handles PADDED. Without the tshark
+   oracle this would have looked like "Chrome sends no headers" rather than a bug.
+2. **`decode_headers` returns empty when `END_HEADERS` is clear.** A CONTINUATION frame
+   follows that the preamble capture does not include, and decoding a partial block would
+   corrupt the dynamic table for no benefit.
+3. **Task 4's crate choice was validated, not assumed.** `fluke-hpack` preserves order,
+   which was the first requirement. It failed the second, which is how the finding above
+   surfaced.
+
+### What is verified, and by what
+
+| Claim | Evidence |
+|---|---|
+| SETTINGS ids, values and wire order | tshark `http2.settings.*`, both fixtures |
+| WINDOW_UPDATE increment | tshark `http2.window_update.window_size_increment` |
+| HPACK header names and order | tshark `http2.header.name`, 6 for curl and 21 for Chrome |
+| Akamai string assembly | Composed from the above, asserted per fixture |
+| Chrome sends no SETTINGS id 3 | `chrome_sends_no_max_concurrent_streams_but_curl_does` |
+| Pseudo-header order discriminates | `chrome_pseudo_header_order_is_masp_and_differs_from_curl` |
+| Frame layer never panics | Truncation at every offset, 5 proptest properties, 8.6M fuzz executions |
+
+### Remaining gaps
+
+1. **The dependency panic is contained, not fixed.** See above. This is the one item that
+   should not carry into M4 unresolved.
+2. **No Firefox fixture**, so the PRIORITY frame path is exercised only synthetically.
+3. **JA4H is still unimplemented** and still has no oracle.
+4. **Chrome's HEADERS frame carries priority information** in its flags (`0x25`,
+   exclusive, weight 255). The Akamai priority field counts standalone PRIORITY frames
+   only, which is why it renders as `0`. Worth re-checking against another implementation
+   if a discrepancy ever appears.
