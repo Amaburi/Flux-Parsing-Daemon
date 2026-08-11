@@ -43,3 +43,30 @@ jobs:
           echo "TERMS.md sha256:"
           sha256sum TERMS.md
           cargo run --quiet -p flux-parsing-daemon --bin fpd -- terms show --hash
+
+  # The ClientHello parser consumes attacker-controlled length fields from the
+  # internet. A short fuzz run on every push catches regressions that the property
+  # tests, which use a fixed seed budget, can miss.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-fuzz --locked
+
+      - name: Fuzz parse_hello
+        run: |
+          cargo +nightly fuzz run parse_hello \
+            --fuzz-dir crates/fingerprint-core/fuzz \
+            -- -max_total_time=60
+
+      # A crash leaves an artifact behind; surface it rather than losing it.
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: crates/fingerprint-core/fuzz/artifacts/

@@ -1,0 +1,47 @@
+=== M2 TDD log — each entry is the RED output captured before implementation ===
+
+## Task 2: reader
+error[E0433]: failed to resolve: use of undeclared type `Reader`
+  --> crates/fingerprint-core/src/reader.rs:13:21
+error[E0433]: failed to resolve: use of undeclared type `Reader`
+  --> crates/fingerprint-core/src/reader.rs:21:21
+error[E0433]: failed to resolve: use of undeclared type `Reader`
+  --> crates/fingerprint-core/src/reader.rs:30:21
+
+## Task 4: grease (run before Task 3 — hello's Chrome test depends on it)
+error[E0425]: cannot find function `is_grease` in this scope
+error[E0425]: cannot find function `is_grease` in this scope
+error[E0425]: cannot find function `is_grease` in this scope
+error[E0425]: cannot find function `strip` in this scope
+
+## Task 3: hello walk
+error: could not compile `fingerprint-core` (lib test) due to 11 previous errors; 1 warning emitted
+error[E0425]: cannot find function `parse_hello` in this scope
+error[E0433]: failed to resolve: use of undeclared type `ParseError`
+
+## Task 5: ext
+error: could not compile `fingerprint-core` (lib test) due to 15 previous errors; 1 warning emitted
+error[E0422]: cannot find struct, variant or union type `RawExt` in this scope
+error[E0425]: cannot find function `first_alpn` in this scope
+error[E0425]: cannot find function `has_sni` in this scope
+error[E0425]: cannot find function `negotiated_version` in this scope
+
+## Task 6: ja3
+error: could not compile `fingerprint-core` (lib test) due to 9 previous errors; 1 warning emitted
+error[E0425]: cannot find function `ec_point_formats` in module `ext`
+error[E0425]: cannot find function `ja3_hash` in this scope
+error[E0425]: cannot find function `ja3_string` in this scope
+
+## Tasks 7-8: ja4
+error[E0425]: cannot find function `alpn_chars` in this scope
+error[E0425]: cannot find function `count2` in this scope
+error[E0425]: cannot find function `fingerprint` in this scope
+error[E0425]: cannot find function `ja4_b` in this scope
+error[E0425]: cannot find function `ja4_c` in this scope
+error[E0425]: cannot find function `ja4_from_hello` in this scope
+error[E0425]: cannot find function `sha256_hex` in this scope
+error[E0425]: cannot find function `version_str` in this scope
+
+## Task 9: properties + fuzz
+(property tests passed immediately — Reader's bounds checks did their job; no red phase)
+fuzz: 672,344 runs in 91s, zero crashes
