@@ -47,10 +47,11 @@ side is live.
 
 ## Carried forward, still unresolved
 
-- **The `fluke-hpack` panic (M3a).** Contained by `catch_unwind`, not fixed. It is
-  network-reachable through this milestone's probe for the first time. Task 8 revisits it.
-- **JA4H remains unimplemented.** No specification in hand and no oracle. `check` will
-  diff TLS and HTTP/2 only, and must not imply otherwise in its output.
+- ~~The `fluke-hpack` panic (M3a).~~ **Resolved.** Replaced by an in-tree HPACK decoder
+  written from RFC 7541. See Task 6.
+- ~~JA4H remains unimplemented.~~ **Resolved by not implementing it.** fpd has its own
+  HTTP-layer comparison instead, for engineering and licensing reasons recorded in
+  design §6.1a. `check` now covers TLS, HTTP/2 and HTTP headers.
 
 ---
 

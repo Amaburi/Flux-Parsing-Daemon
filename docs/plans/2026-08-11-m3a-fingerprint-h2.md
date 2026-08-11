@@ -612,8 +612,12 @@ that `unwrap` or move to a different decoder. Once the dependency no longer pani
 
 ### Remaining gaps
 
-1. **The dependency panic is contained, not fixed.** See above. This is the one item that
-   should not carry into M4 unresolved.
+1. ~~The dependency panic is contained, not fixed.~~ **Resolved during M3b.** The
+   dependency was replaced with an in-tree HPACK decoder (`crates/fingerprint-h2/src/hpack/`)
+   written against RFC 7541 and validated with the RFC's own worked examples. The
+   `catch_unwind` is gone, the fuzz target covers HPACK again, and `fluke-hpack` no
+   longer appears in `Cargo.lock`. Report text for upstream is in
+   `docs/upstream/fluke-hpack-panic.md`.
 2. **No Firefox fixture**, so the PRIORITY frame path is exercised only synthetically.
 3. **JA4H is still unimplemented** and still has no oracle.
 4. **Chrome's HEADERS frame carries priority information** in its flags (`0x25`,

@@ -55,7 +55,8 @@ emulation rather than assert one.
 
 ## 2. Goals
 
-- Compute JA3, JA4, the Akamai HTTP/2 fingerprint, and JA4H for any TLS client.
+- Compute JA3, JA4 and the Akamai HTTP/2 fingerprint for any TLS client, plus fpd's
+  own HTTP-layer comparison (§6.1a).
 - Passively annotate inbound traffic on a server the operator controls, surfacing
   fingerprints in that server's existing logs with no application code changes.
 - Detect **claim/identity mismatch**: a request whose `User-Agent` asserts a browser
@@ -337,9 +338,26 @@ measurement, once because emulation reproduces from the same structure:
   (`m,p,a,s`). Any structure that sorts or normalises destroys the measurement *and*
   makes faithful emulation impossible.
 
-**`HttpFingerprint`** — JA4H: method, HTTP version, cookie and referer presence, header
-count, `Accept-Language`, plus truncated hashes over header *names* in wire order and
-over cookie field names. Header **values are never read or stored** (§10).
+**`HttpProfile`** (§6.1a) — the HTTP layer, as fpd's own design rather than JA4H.
+Header names in wire order, a header count, and `Accept-Language` presence. Method,
+referer and cookie-header count are recorded but never compared, because they are
+properties of a request rather than of a client. Header **values are never read or
+stored** (§10), which includes cookie values.
+
+**JA4H is deliberately not implemented.** Three reasons, engineering first:
+
+1. A hash cannot be diffed, and fpd's purpose is to report *which* field differs.
+   `missing: sec-ch-ua, sec-fetch-site` is actionable where `hash a1b2…` is not.
+2. JA4H hashes cookie fields together with their **values**, which contradicts the
+   privacy position in §10. fpd records the count of `cookie` headers instead, which is
+   real signal because HPACK splits them and requires reading nothing.
+3. JA4H fingerprints a *request*; fpd profiles a *client*. Comparing method or referer
+   would make one browser fail to match its own profile across two page loads.
+
+Separately, JA4 (TLS) is BSD 3-Clause with no patent claims, which is why it is
+implemented here, while JA4H and the rest of the JA4+ suite are patent pending under
+FoxIO License 1.1, which is not permissive for monetization. Anyone needing JA4H
+specifically should approach FoxIO directly.
 
 ### 6.2 Capture path
 
@@ -414,7 +432,7 @@ localhost, injecting:
 ```
 X-FP-JA4:        t13d1516h2_8daaf6152771_02713d6af862
 X-FP-H2:         1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p
-X-FP-JA4H:       ge11cn20enus_...
+X-FP-HTTP-Headers: cache-control,sec-ch-ua,sec-fetch-site,...
 X-FP-Verdict:    chrome-131-win
 X-FP-Confidence: 1.00
 X-FP-Mismatch:   false
@@ -712,7 +730,7 @@ second one is what this spec promises.
 |---|---|---|
 | M1 | `TERMS.md` + `NOTICE`, Apache-2.0, `include_str!` embedding + `build.rs` hash, acceptance gate, `fpd terms`, gate + immutability tests | Every subcommand refused when unaccepted; forged record rejected; terms text identical with no `TERMS.md` on disk |
 | M2 | `fingerprint-core` TLS: ClientHello parser, JA3, JA4, fixture harness | JA4 for curl/Chrome/Firefox fixtures matches known-good values |
-| M3 | H2 read path, JA4H, `RecordingStream`, `fpd check` + `fpd capture --samples` | Correct diff for curl vs. a captured Chrome; equivalence class inferred from repeat samples |
+| M3 | H2 read path, own HPACK decoder, HTTP layer, `RecordingStream`, `fpd check` + `fpd capture --samples` | Correct diff for curl vs. a captured Chrome; equivalence class inferred from repeat samples |
 | M4 | `fpd serve` proxy, header injection, verdict engine, structured logs, `fingerprint-tower` | Real Chrome and curl through `serve` land correctly annotated in an upstream's logs |
 | M5 | `fingerprint-emulate`: BoringSSL ClientHello control, patched h2 write path, `--verify` | Every shipped profile passes 16 repeat draws under its equivalence class in CI |
 | M6 | `fpd tui`, admin socket, fuzzing in CI, docs, crates.io release | Demo GIF, published crates, deployed public instance |
