@@ -951,7 +951,14 @@ Wait for the owner before starting Task 8.
 
 **Interfaces:**
 - Consumes: `store::load`, `store::config_dir`.
-- Produces: `gate::applies_to(argv: &[String]) -> bool`, `gate::check(dir: &Path) -> Result<(), GateRefusal>`, `GateRefusal::message() -> String`.
+- Produces: `gate::applies_to(argv: &[String]) -> bool`, `gate::check_with(dir: &Path, env_accepted: bool) -> Result<(), GateRefusal>`, `gate::check(dir: &Path) -> Result<(), GateRefusal>`, `gate::env_accepted() -> bool`, `GateRefusal::message() -> String`.
+
+**Deviation from the original plan, applied during execution.** `check` was split into a
+pure `check_with(dir, env_accepted)` plus a thin `check(dir)` that supplies
+`env_accepted()`. Reason: `FPD_ACCEPT_TERMS` is process-global, so a unit test setting it
+would race every other test in the binary — Rust runs tests in parallel threads. The
+pure function is unit-tested; the real environment variable is exercised in Task 9's
+integration tests, where each invocation is its own process and cannot race.
 
 The gate reads raw `argv` rather than parsed clap output, so it runs before argument validation. A subcommand with a usage error still cannot execute anything.
 

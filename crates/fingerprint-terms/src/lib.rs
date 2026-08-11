@@ -2,6 +2,7 @@
 
 //! Terms embedding, acceptance records, and the invocation gate for fpd.
 
+pub mod gate;
 pub mod history;
 pub mod record;
 pub mod store;
