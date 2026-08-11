@@ -1,8 +1,7 @@
-//! HPACK decoding.
+//! HEADERS frame handling.
 //!
-//! Header **order** is the fingerprint, so the decoder must preserve it. A decoder
-//! that returned a map would be unusable here. `fluke-hpack` returns a `Vec` of
-//! pairs in wire order, which is the property this module depends on.
+//! Header **order** is the fingerprint, so decoding preserves it and the result is
+//! a `Vec` rather than a map. The decoder itself lives in `crate::hpack`.
 //!
 //! Independently validated: tshark's `http2.header.name` reports the same names in
 //! the same order for both fixtures.
@@ -70,46 +69,19 @@ pub fn decode_headers(frame: &Frame) -> Vec<(String, String)> {
     decode_fragment(header_block_fragment(frame))
 }
 
-/// Runs the HPACK decoder with panics contained.
+/// Decodes a header block fragment.
 ///
-/// **This wrapper exists because of an upstream bug, not out of caution.**
-/// `fluke-hpack` 0.3.1 `decoder.rs:505` reads
+/// A malformed block yields an empty list. To a fingerprint an undecodable header
+/// block and an absent one mean the same thing.
 ///
-/// ```text
-/// let (new_size, consumed) = decode_integer(buf, 5).ok().unwrap();
-/// ```
-///
-/// inside `update_max_dynamic_size`, which returns `Result`. A header block that
-/// begins with a dynamic-table-size-update byte followed by a malformed varint
-/// therefore panics instead of returning the error the signature promises. Found
-/// by the `arbitrary_headers_payloads_never_panic` property test.
-///
-/// The input is attacker controlled and reaches this code from the network, so an
-/// uncontained panic would be a per-connection denial of service once `serve`
-/// exists. `catch_unwind` is sound here because the decoder is created inside the
-/// closure and dropped on unwind, so no partially mutated state escapes.
-///
-/// Two limitations, stated rather than glossed over. It does not help under
-/// `panic = "abort"`, and the panic message still reaches stderr, so a flood of
-/// malformed requests becomes log noise. The real fix is upstream or a vendored
-/// patch replacing that `unwrap`.
+/// This used to wrap `fluke-hpack` in `catch_unwind`, because that crate panics on
+/// malformed input at `decoder.rs:505`, where a `Result` is unwrapped inside a
+/// function returning `Result`. The containment worked but did nothing under
+/// `panic = "abort"`, turned malformed requests into stderr noise, and left the
+/// fuzz target unable to cover this path. The decoder in `crate::hpack` returns
+/// errors instead, so all three problems are gone rather than managed.
 fn decode_fragment(fragment: &[u8]) -> Vec<(String, String)> {
-    let decoded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        fluke_hpack::Decoder::new().decode(fragment).ok()
-    }));
-
-    match decoded {
-        Ok(Some(pairs)) => pairs
-            .into_iter()
-            .map(|(n, v)| {
-                (
-                    String::from_utf8_lossy(&n).into_owned(),
-                    String::from_utf8_lossy(&v).into_owned(),
-                )
-            })
-            .collect(),
-        Ok(None) | Err(_) => Vec::new(),
-    }
+    crate::hpack::decoder::decode(fragment).unwrap_or_default()
 }
 
 /// Pseudo-header order as single letters, comma joined. Chrome emits `m,a,s,p`
@@ -249,16 +221,18 @@ mod tests {
 
     // --- the panic-freedom contract the plan required verifying ---------------
 
-    /// Regression for the upstream panic documented on `decode_fragment`.
+    /// Regression for the panic that used to live in the HPACK dependency.
     ///
     /// `0x3f` is `001_11111`: a dynamic table size update whose 5-bit prefix is
     /// saturated, so the value continues into following octets. With none
-    /// present, `decode_integer` fails and fluke-hpack 0.3.1 calls
-    /// `.ok().unwrap()` on the result. Uncontained, this is a remotely triggerable
-    /// panic. If this test ever starts failing, the `catch_unwind` in
-    /// `decode_fragment` has been removed or defeated.
+    /// present, `fluke-hpack` 0.3.1 called `.ok().unwrap()` on the failed decode
+    /// and panicked, which was reachable from the network.
+    ///
+    /// `crate::hpack` returns `Truncated` instead, so this now passes because no
+    /// panic occurs rather than because one is caught. The distinction matters:
+    /// there is no `catch_unwind` left to defeat.
     #[test]
-    fn the_upstream_hpack_size_update_panic_stays_contained() {
+    fn the_hpack_size_update_input_is_an_error_not_a_panic() {
         for payload in [
             &[0x3f][..],
             &[0x3f, 0xff][..],
@@ -274,7 +248,7 @@ mod tests {
             };
             assert!(
                 decode_headers(&f).is_empty(),
-                "must degrade to empty, not panic, for {payload:02x?}"
+                "must degrade to empty for {payload:02x?}"
             );
         }
     }

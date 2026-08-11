@@ -2,3 +2,9 @@
 
 ## Task 1: recording stream
 (written test-first; RecordingStream absent -> cannot find type)
+
+## HPACK: integer codec
+
+## HPACK: huffman
+
+## HPACK: table + decoder
