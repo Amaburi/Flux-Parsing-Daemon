@@ -2,6 +2,8 @@
 
 //! Terms embedding, acceptance records, and the invocation gate for fpd.
 
+pub mod record;
+
 /// The canonical terms text, compiled into the binary.
 ///
 /// This is never read from the filesystem at runtime. Deleting or editing
