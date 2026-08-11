@@ -311,10 +311,21 @@ t13d1516h2_8daaf6152771_02713d6af862
 `SETTINGS | WINDOW_UPDATE | PRIORITY | pseudo-header order`:
 
 ```
-chrome-131    1:65536;2:0;4:6291456;6:262144 | 15663105 | 0            | m,a,s,p
-firefox-133   1:65536;4:131072;5:16384       | 12517377 | 3:0:0:201,…  | m,p,a,s
-curl/nghttp2  3:100;4:1048576                | 1048576  | 0            | m,s,a,p
+chrome-131    1:65536;2:0;4:6291456;6:262144 | 15663105   | 0            | m,a,s,p
+firefox-133   1:65536;4:131072;5:16384       | 12517377   | 3:0:0:201,…  | m,p,a,s
+curl 8.7.1    3:100;4:10485760;2:0           | 1048510465 | 0            | m,s,a,p   ← measured
 ```
+
+The curl row is **measured**, captured in the M0 S2 spike
+(`docs/spikes/s2-capture-raw.txt`); the browser rows are reference values pending
+capture. Two things the measurement corrected:
+
+- The SETTINGS arrive in the order `3, 4, 2` — *not* ascending. Any implementation that
+  normalises or sorts settings destroys the fingerprint. This is the concrete reason
+  `settings` is an ordered `Vec<(u16, u32)>`.
+- The WINDOW_UPDATE increment 1048510465 is `1048576000 − 65535`: curl raising the
+  connection window from the protocol default to 1000 MiB. The value is a client
+  configuration artefact, which is exactly why it discriminates between clients.
 
 Two details the model must preserve, and they matter twice over now — once for
 measurement, once because emulation reproduces from the same structure:
