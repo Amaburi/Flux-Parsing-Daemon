@@ -551,6 +551,7 @@ dependencies = [
  "boring",
  "boring-sys",
  "fingerprint-core",
+ "fingerprint-h2",
  "fingerprint-probe",
  "foreign-types",
  "thiserror",

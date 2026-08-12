@@ -69,7 +69,6 @@ pub fn run(args: Args) -> u8 {
         };
 
         print!("{d}");
-        println!("  (TLS layer only; HTTP/2 emulation is not implemented)");
 
         if d.is_clean() {
             EXIT_MATCH

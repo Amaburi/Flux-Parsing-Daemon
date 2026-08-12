@@ -24,7 +24,7 @@ In development. What works today:
 | Claim mismatch | **Working.** Flags a client whose User-Agent contradicts its fingerprint. |
 | `fpd serve` | **Working.** Reverse proxy that annotates traffic for any upstream. |
 | `fingerprint-tower` | **Working.** Embedded in a Rust app, no proxy and no extra hop. |
-| `fpd emulate --verify` | **Working**, TLS layer. Reproduces a profile and proves it. |
+| `fpd emulate --verify` | **Working.** Reproduces a profile across TLS and HTTP/2, and proves it. |
 | `tui` | Not implemented. Stub. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
@@ -112,7 +112,7 @@ fn emulation_matches_every_shipped_profile() {
 No network. Runs in CI. A dependency bump that breaks emulation fails the build that
 day instead of producing a mysterious 403 three weeks later.
 
-This works today for the TLS layer:
+This works today:
 
 ```console
 $ fpd emulate --profile chrome-macos --verify
@@ -121,8 +121,12 @@ $ fpd emulate --profile chrome-macos --verify
   ✓ GREASE          1 cipher, 2 extension
   ✓ ALPN            h2
   ✓ SNI             absent
+  ✓ SETTINGS        1:65536;2:0;4:6291456;6:262144
+  ✓ WINDOW_UPDATE   15663105
+  ✓ pseudo-header   m,a,s,p
+  ✓ header order    14 headers
+  ✓ accept-language present
   verdict: matches chrome-macos
-  (TLS layer only; HTTP/2 emulation is not implemented)
 ```
 
 The comparison uses the profile's own equivalence class, not byte equality. Two
@@ -138,14 +142,23 @@ Emulation is behind a non-default feature, since it pulls in BoringSSL:
 $ cargo build --features emulation
 ```
 
-What it does not do yet, stated so nobody discovers it late:
+What it does not do, stated so nobody discovers it late:
 
-- **HTTP/2 emulation.** SETTINGS order, WINDOW_UPDATE and pseudo-header order cannot be
-  controlled through the stock `h2` crate, so that needs a patched writer. Separate work.
+- **Profiles carry the shape of a request, never its values.** That follows directly from
+  the privacy position below: fpd records header names, order and counts and nothing else.
+  So emulation reproduces which headers are sent and in what order, and the caller supplies
+  what goes in them. Empty values reproduce the fingerprint but would not survive anything
+  that inspects content.
 - **Certificate compression is advertised but not implemented.** The extension appears in
   the ClientHello, which is what a fingerprint is made of, but a live server that actually
   compresses its certificate chain will fail the connection. Fine for verifying a profile,
   not fine for a general-purpose client.
+- **HPACK encoding shape is not part of the fingerprint.** Two encoders can produce the
+  same decoded headers from different bytes. Static-table hits use the indexed form, as
+  browsers do, which narrows the gap without closing it.
+- **Only browsers can be emulated.** curl offers 31 legacy cipher suites this does not map,
+  and emulating curl is not a use case: you would run curl. Attempting it errors rather
+  than producing a handshake that reproduces nothing.
 
 ## Two directions
 
