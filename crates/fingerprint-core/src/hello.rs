@@ -3,10 +3,22 @@
 
 use crate::reader::{ParseError, Reader};
 
+/// A byte range within the buffer passed to `parse_hello`.
+///
+/// Absolute, not relative to any of the nested readers the walk builds, so a
+/// caller holding the original bytes can slice with it directly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: usize,
+    pub len: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawExt<'a> {
     pub id: u16,
     pub body: &'a [u8],
+    /// Covers the whole extension record, its 4-byte header and its body.
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +26,11 @@ pub struct RawHello<'a> {
     pub legacy_version: u16,
     pub ciphers: Vec<u16>,
     pub extensions: Vec<RawExt<'a>>,
+    pub cipher_span: Span,
+    /// The extensions block, excluding its own 2-byte length prefix. Zero length
+    /// when the ClientHello carries no extensions block at all, which TLS 1.2 and
+    /// earlier are allowed to do.
+    pub extensions_span: Span,
 }
 
 /// Walks one TLS handshake record containing a ClientHello.
@@ -28,6 +45,9 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
     }
     let _record_version = r.u16()?;
     let record_len = r.u16()? as usize;
+    // Base of each nesting level within `raw`, derived from the reader rather than
+    // hardcoded, so a change to either header cannot silently shift every span.
+    let record_base = r.position();
     let record_body = r.take(record_len)?;
 
     let mut h = Reader::new(record_body);
@@ -35,6 +55,7 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
         return Err(ParseError::NotClientHello);
     }
     let hs_len = h.u24()? as usize;
+    let hs_base = record_base + h.position();
     let mut c = Reader::new(h.take(hs_len)?);
 
     let legacy_version = c.u16()?;
@@ -46,6 +67,10 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
     if !cs_len.is_multiple_of(2) {
         return Err(ParseError::Malformed("cipher_suites length"));
     }
+    let cipher_span = Span {
+        start: hs_base + c.position(),
+        len: cs_len,
+    };
     let cs_bytes = c.take(cs_len)?;
     let ciphers: Vec<u16> = cs_bytes
         .chunks_exact(2)
@@ -57,14 +82,33 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
 
     // TLS 1.2 and earlier may omit the extensions block entirely.
     let mut extensions = Vec::new();
+    let mut extensions_span = Span {
+        start: hs_base + c.position(),
+        len: 0,
+    };
     if c.remaining() >= 2 {
         let ext_total = c.u16()? as usize;
+        let ext_base = hs_base + c.position();
+        extensions_span = Span {
+            start: ext_base,
+            len: ext_total,
+        };
         let mut e = Reader::new(c.take(ext_total)?);
         while e.remaining() >= 4 {
+            // Taken before the id and length are read, so the span covers the
+            // whole record rather than only its body.
+            let start = ext_base + e.position();
             let id = e.u16()?;
             let len = e.u16()? as usize;
             let body = e.take(len)?;
-            extensions.push(RawExt { id, body });
+            extensions.push(RawExt {
+                id,
+                body,
+                span: Span {
+                    start,
+                    len: len + 4,
+                },
+            });
         }
     }
 
@@ -72,6 +116,8 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
         legacy_version,
         ciphers,
         extensions,
+        cipher_span,
+        extensions_span,
     })
 }
 
@@ -182,6 +228,80 @@ mod tests {
             for cut in 0..raw.len() {
                 let slice = raw.get(..cut).unwrap_or_default();
                 let _ = parse_hello(slice);
+            }
+        }
+    }
+
+    // --- byte spans ----------------------------------------------------------
+
+    /// The span must independently reproduce the value the parser returned. An
+    /// off-by-one span still slices cleanly and still yields u16s, so comparing
+    /// against `h.ciphers` is what actually catches it.
+    #[test]
+    fn the_cipher_span_reproduces_the_parsed_cipher_list() {
+        for name in ["curl-8.7.1-macos", "chrome-macos"] {
+            let raw = fixture(name);
+            let h = parse_hello(&raw).expect("parse");
+            let bytes = &raw[h.cipher_span.start..h.cipher_span.start + h.cipher_span.len];
+            let from_span: Vec<u16> = bytes
+                .chunks_exact(2)
+                .filter_map(|p| Some(u16::from_be_bytes([*p.first()?, *p.get(1)?])))
+                .collect();
+            assert_eq!(from_span, h.ciphers, "{name}");
+        }
+    }
+
+    /// Each extension span covers the whole extension record, its 4-byte header
+    /// plus its body, so a renderer can highlight one extension as a unit.
+    #[test]
+    fn each_extension_span_covers_its_own_header_and_body() {
+        let raw = fixture("chrome-macos");
+        let h = parse_hello(&raw).expect("parse");
+        assert!(!h.extensions.is_empty(), "precondition");
+
+        for e in &h.extensions {
+            let b = &raw[e.span.start..e.span.start + e.span.len];
+            assert_eq!(b.len(), 4 + e.body.len(), "ext {} length", e.id);
+            assert_eq!(
+                u16::from_be_bytes([b[0], b[1]]),
+                e.id,
+                "ext {} must start with its own id",
+                e.id
+            );
+            assert_eq!(&b[4..], e.body, "ext {} body", e.id);
+        }
+    }
+
+    /// The extensions block span must contain every individual extension span, or
+    /// a renderer drawing the block would draw it in the wrong place.
+    #[test]
+    fn the_extensions_span_contains_every_extension() {
+        let raw = fixture("chrome-macos");
+        let h = parse_hello(&raw).expect("parse");
+        let block_end = h.extensions_span.start + h.extensions_span.len;
+
+        for e in &h.extensions {
+            assert!(e.span.start >= h.extensions_span.start, "ext {}", e.id);
+            assert!(e.span.start + e.span.len <= block_end, "ext {}", e.id);
+        }
+    }
+
+    /// Every span must be in bounds for the buffer it indexes. A span past the end
+    /// would panic a renderer that slices with it, and the renderer is the one
+    /// place that cannot afford a panic.
+    #[test]
+    fn every_span_is_in_bounds() {
+        for name in ["curl-8.7.1-macos", "chrome-macos", "curl-8.7.1-macos-sni"] {
+            let raw = fixture(name);
+            let h = parse_hello(&raw).expect("parse");
+            let mut spans = vec![h.cipher_span, h.extensions_span];
+            spans.extend(h.extensions.iter().map(|e| e.span));
+            for s in spans {
+                assert!(
+                    s.start + s.len <= raw.len(),
+                    "{name}: span {s:?} exceeds {} bytes",
+                    raw.len()
+                );
             }
         }
     }

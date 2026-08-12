@@ -177,10 +177,7 @@ mod tests {
     /// supported_versions carries GREASE too. It must not win the "highest" contest.
     #[test]
     fn grease_in_supported_versions_is_ignored() {
-        let ext = [RawExt {
-            id: 43,
-            body: &[0x04, 0x0a, 0x0a, 0x03, 0x04],
-        }];
+        let ext = [synthetic(43, &[0x04, 0x0a, 0x0a, 0x03, 0x04])];
         assert_eq!(negotiated_version(&ext, 0x0303), 0x0304);
     }
 
@@ -189,28 +186,22 @@ mod tests {
         assert_eq!(negotiated_version(&[], 0x0303), 0x0303);
     }
 
+    /// These extensions are synthesised rather than parsed out of a buffer, so
+    /// there is no position for them to point at. Nothing under test reads it.
+    fn synthetic(id: u16, body: &[u8]) -> RawExt<'_> {
+        RawExt {
+            id,
+            body,
+            span: crate::hello::Span { start: 0, len: 0 },
+        }
+    }
+
     #[test]
     fn a_truncated_extension_body_yields_a_default_not_a_panic() {
+        assert_eq!(first_alpn(&[synthetic(16, &[0xff])]), None);
+        assert!(sig_algs(&[synthetic(13, &[0xff, 0xff])]).is_empty());
         assert_eq!(
-            first_alpn(&[RawExt {
-                id: 16,
-                body: &[0xff]
-            }]),
-            None
-        );
-        assert!(sig_algs(&[RawExt {
-            id: 13,
-            body: &[0xff, 0xff]
-        }])
-        .is_empty());
-        assert_eq!(
-            negotiated_version(
-                &[RawExt {
-                    id: 43,
-                    body: &[0xff]
-                }],
-                0x0303
-            ),
+            negotiated_version(&[synthetic(43, &[0xff])], 0x0303),
             0x0303
         );
     }

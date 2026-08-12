@@ -30,6 +30,13 @@ impl<'a> Reader<'a> {
         self.buf.len().saturating_sub(self.pos)
     }
 
+    /// Offset of the next unread byte, relative to the slice this reader was built
+    /// over. Callers combine it with the base offset of that slice to get a
+    /// position that is absolute within the original buffer.
+    pub fn position(&self) -> usize {
+        self.pos
+    }
+
     /// The single choke point. `checked_add` matters: a length near `usize::MAX`
     /// would otherwise wrap and turn the range check into a silent over-read.
     pub fn take(&mut self, n: usize) -> Result<&'a [u8], ParseError> {
