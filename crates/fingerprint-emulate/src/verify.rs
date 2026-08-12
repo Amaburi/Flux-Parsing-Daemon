@@ -18,10 +18,6 @@ use fingerprint_probe::profile::Profile;
 use crate::build::{build, configure};
 use crate::EmulateError;
 
-/// TLS-layer fields. HTTP/2 emulation is a separate problem, since SETTINGS order
-/// and pseudo-header order cannot be controlled through the stock `h2` crate.
-const TLS_FIELDS: &[&str] = &["ciphers", "extensions", "GREASE", "ALPN", "SNI"];
-
 /// Builds a client from `profile`, connects it to a local probe, and reports how
 /// the captured handshake compares to the profile it came from.
 ///
@@ -29,11 +25,9 @@ const TLS_FIELDS: &[&str] = &["ciphers", "extensions", "GREASE", "ALPN", "SNI"];
 /// extension order and rotates GREASE values, so byte equality would fail against
 /// the real browser too. See `fingerprint_probe::diff`.
 ///
-/// **Scoped to the TLS layer.** The emulated client completes a handshake and
-/// stops, so no HTTP/2 preamble exists to compare. Including an HTTP/2 field here
-/// would show a difference that is a statement about scope rather than about the
-/// emulation, which is the kind of output that teaches a reader to ignore
-/// failures.
+/// Covers both layers. The emulated client completes the handshake and then
+/// writes an HTTP/2 preamble built from the same profile, so SETTINGS order,
+/// WINDOW_UPDATE and pseudo-header order are compared alongside the TLS fields.
 pub async fn verify(profile: &Profile) -> Result<Diff, EmulateError> {
     let probe = Probe::bind()
         .await
@@ -43,14 +37,23 @@ pub async fn verify(profile: &Profile) -> Result<Diff, EmulateError> {
     let connector = build(profile)?;
     let cfg = configure(&connector, profile, "localhost")?;
 
+    // Built before the client task so a bad profile fails here rather than inside
+    // a spawned task where the error would be lost.
+    let preamble = crate::h2::preamble_for(profile, "localhost").unwrap_or_default();
+
     // The client runs on a separate task so the probe can accept it.
     let client = tokio::spawn(async move {
         let Ok(tcp) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await else {
             return;
         };
-        // A failed handshake is fine and expected: the probe never replies, and
-        // the ClientHello is captured before any alert. The bytes are what matter.
-        let _ = tokio_boring::connect(cfg, "localhost", tcp).await;
+        let Ok(mut tls) = tokio_boring::connect(cfg, "localhost", tcp).await else {
+            return;
+        };
+        // The probe reads the preamble and never replies, so a write error here
+        // means the probe already has what it needs.
+        use tokio::io::AsyncWriteExt;
+        let _ = tls.write_all(&preamble).await;
+        let _ = tls.flush().await;
     });
 
     let report = probe
@@ -60,7 +63,5 @@ pub async fn verify(profile: &Profile) -> Result<Diff, EmulateError> {
 
     client.abort();
 
-    let mut d = diff(&report, profile);
-    d.fields.retain(|f| TLS_FIELDS.contains(&f.field.as_str()));
-    Ok(d)
+    Ok(diff(&report, profile))
 }

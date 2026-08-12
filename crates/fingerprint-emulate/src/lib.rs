@@ -33,6 +33,8 @@ pub mod build;
 #[cfg(feature = "emulation")]
 pub mod extensions;
 #[cfg(feature = "emulation")]
+pub mod h2;
+#[cfg(feature = "emulation")]
 pub mod verify;
 
 #[derive(Debug, thiserror::Error)]
