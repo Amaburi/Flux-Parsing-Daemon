@@ -196,6 +196,7 @@ fn build_report(raw: &[u8], preamble: &[u8], alpn: Option<String>) -> Option<Cli
     let tls = fingerprint_core::ja4::fingerprint(raw).ok()?;
     Some(ClientReport {
         tls,
+        raw_hello: crate::probe::retain(raw),
         h2: fingerprint_h2::akamai::fingerprint(preamble).ok(),
         alpn,
         handshake_failed: false,

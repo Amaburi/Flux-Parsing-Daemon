@@ -89,3 +89,43 @@ async fn the_probe_exports_a_certificate_for_clients_that_want_to_trust_it() {
     let probe = Probe::bind().await.expect("bind");
     assert!(probe.cert_pem().starts_with("-----BEGIN CERTIFICATE-----"));
 }
+
+/// The strongest available check that the retained bytes are the right bytes:
+/// re-fingerprinting them must produce the fingerprint already reported. A
+/// truncated or offset buffer cannot pass this.
+#[tokio::test]
+async fn the_retained_bytes_reproduce_the_reported_fingerprint() {
+    if !curl_available() {
+        eprintln!("curl not available, skipping");
+        return;
+    }
+    let report = capture_curl(&["-sk", "--http2"]).await;
+    assert!(!report.raw_hello.is_empty(), "bytes must be retained");
+
+    let again = fingerprint_core::ja4::fingerprint(&report.raw_hello).expect("re-parse");
+    assert_eq!(again.ja4, report.tls.ja4);
+    assert_eq!(again.ja4_r, report.tls.ja4_r);
+}
+
+/// The provenance spans must index the retained buffer, not some other buffer.
+/// This is the exact operation the TUI performs, asserted here so that a renderer
+/// panic becomes a test failure instead.
+#[tokio::test]
+async fn provenance_spans_index_the_retained_buffer() {
+    if !curl_available() {
+        eprintln!("curl not available, skipping");
+        return;
+    }
+    let report = capture_curl(&["-sk", "--http2"]).await;
+    let s = report.tls.provenance.ciphers;
+    assert!(
+        s.start + s.len <= report.raw_hello.len(),
+        "span outside retained bytes"
+    );
+
+    let from_span: Vec<u16> = report.raw_hello[s.start..s.start + s.len]
+        .chunks_exact(2)
+        .filter_map(|p| Some(u16::from_be_bytes([*p.first()?, *p.get(1)?])))
+        .collect();
+    assert_eq!(from_span, report.tls.ciphers);
+}

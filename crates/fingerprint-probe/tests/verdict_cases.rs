@@ -22,8 +22,12 @@ fn report(which: &str) -> ClientReport {
             "../fingerprint-h2/tests/fixtures/chrome-h2.bin",
         ),
     };
+    // Read once and retain the same bytes the fingerprint was built from, so these
+    // fixture-driven reports have the same shape as one from a live capture.
+    let raw = read(tls_fx);
     ClientReport {
-        tls: ja4::fingerprint(&read(tls_fx)).expect("tls"),
+        tls: ja4::fingerprint(&raw).expect("tls"),
+        raw_hello: raw,
         h2: akamai::fingerprint(&read(h2_fx)).ok(),
         alpn: Some("h2".into()),
         handshake_failed: false,

@@ -133,6 +133,7 @@ impl Acceptor {
 
         let report = ClientReport {
             tls: tls_fp,
+            raw_hello: fingerprint_probe::probe::retain(&raw),
             h2: fingerprint_h2::akamai::fingerprint(&preamble).ok(),
             alpn,
             handshake_failed: false,

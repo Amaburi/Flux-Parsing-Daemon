@@ -30,10 +30,30 @@ pub enum ProbeError {
     NoClientHello,
 }
 
+/// Upper bound on ClientHello bytes retained per connection.
+///
+/// Separate from, and tighter than, `RecordingStream::DEFAULT_CAP`, which bounds
+/// what is read from the wire. This bounds what is kept afterwards, and the
+/// connection ring buffer holds many reports at once. A real ClientHello runs from
+/// a few hundred bytes to about 2 KB with a large session ticket, so this retains
+/// every genuine handshake in full while capping a hostile one.
+pub const MAX_RETAINED_HELLO: usize = 8 * 1024;
+
+/// Copies at most `MAX_RETAINED_HELLO` bytes. Public because every crate that
+/// builds a `ClientReport` needs it, including `fingerprint-tower`.
+pub fn retain(raw: &[u8]) -> Vec<u8> {
+    raw.get(..raw.len().min(MAX_RETAINED_HELLO))
+        .unwrap_or(raw)
+        .to_vec()
+}
+
 /// What one client looked like on the wire.
 #[derive(Debug, Clone)]
 pub struct ClientReport {
     pub tls: TlsFingerprint,
+    /// The ClientHello bytes that `tls.provenance` indexes into, capped at
+    /// `MAX_RETAINED_HELLO`.
+    pub raw_hello: Vec<u8>,
     /// `None` when ALPN did not negotiate h2, or when the client disconnected
     /// before sending a complete request.
     pub h2: Option<H2Fingerprint>,
@@ -138,6 +158,7 @@ impl Probe {
 
         Ok(ClientReport {
             tls,
+            raw_hello: retain(&raw),
             h2,
             alpn,
             handshake_failed,
@@ -185,4 +206,26 @@ async fn capture_h2<S: AsyncRead + AsyncWrite + Unpin>(
     // before headers do.
     let _ = read;
     fingerprint_h2::akamai::fingerprint(&captured).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A hostile client can send a large ClientHello. Retention is bounded
+    /// independently of the wire capture cap, because the ring buffer holds many
+    /// of these at once.
+    #[test]
+    fn retention_is_capped() {
+        let big = vec![0u8; MAX_RETAINED_HELLO * 4];
+        assert_eq!(retain(&big).len(), MAX_RETAINED_HELLO);
+    }
+
+    /// The paired negative. A cap that always truncated would pass the test above
+    /// while corrupting every real handshake.
+    #[test]
+    fn a_normal_hello_is_retained_whole() {
+        let normal = vec![7u8; 1500];
+        assert_eq!(retain(&normal), normal);
+    }
 }
