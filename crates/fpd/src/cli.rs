@@ -72,8 +72,15 @@ pub enum Command {
         #[arg(long, default_value_t = 30)]
         timeout: u64,
     },
-    /// Emulate a captured profile  (M5)
-    Emulate,
+    /// Emulate a captured profile and prove it reproduces
+    Emulate {
+        /// Profile to reproduce
+        #[arg(long, default_value = "chrome-macos")]
+        profile: String,
+        /// Connect the emulated client to a local probe and diff the result
+        #[arg(long)]
+        verify: bool,
+    },
 }
 
 #[derive(Subcommand)]

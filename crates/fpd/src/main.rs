@@ -89,7 +89,10 @@ fn main() -> ExitCode {
             });
             return ExitCode::from(code);
         }
-        Some(cli::Command::Emulate) => println!("emulate: not yet implemented (M5)"),
+        Some(cli::Command::Emulate { profile, verify }) => {
+            let code = commands::emulate::run(commands::emulate::Args { profile, verify });
+            return ExitCode::from(code);
+        }
         None => {
             // Unreachable in practice: bare argv is gated above.
             eprintln!("fpd: no command given; try `fpd --help`");
