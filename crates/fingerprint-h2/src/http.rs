@@ -26,6 +26,15 @@
 /// property of the site and the navigation rather than of the client.
 const REQUEST_SCOPED: &[&str] = &["cookie", "referer"];
 
+/// fpd's own header namespace.
+///
+/// A client can send these, and `serve` strips them before forwarding. They must
+/// therefore not appear in the fingerprint either, or a client could alter its own
+/// HTTP-layer identity by sending headers that fpd is about to delete. Found by
+/// running `serve` against a real upstream and seeing `x-fp-verdict` inside
+/// `x-fp-http-headers`.
+const FP_PREFIX: &str = "x-fp-";
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct HttpProfile {
     // --- client identifying, compared ---------------------------------------
@@ -66,6 +75,10 @@ impl HttpProfile {
                 if lower == ":method" {
                     method = Some(value.clone());
                 }
+                continue;
+            }
+
+            if lower.starts_with(FP_PREFIX) {
                 continue;
             }
 
@@ -219,6 +232,22 @@ mod tests {
     fn header_names_are_lowercased_so_casing_cannot_split_a_match() {
         let p = HttpProfile::from_headers(&[("User-Agent".into(), "x".into())]);
         assert_eq!(p.header_names, vec!["user-agent"]);
+    }
+
+    /// Regression. `serve` strips `x-fp-*` before forwarding, so those names must
+    /// not reach the fingerprint either. Otherwise a client alters its own
+    /// HTTP-layer identity by sending headers fpd is about to delete. Found by
+    /// running serve against a real upstream, not by a test.
+    #[test]
+    fn fpd_own_header_namespace_is_excluded_from_the_fingerprint() {
+        let p = HttpProfile::from_headers(&[
+            ("user-agent".into(), "curl/8.7.1".into()),
+            ("x-fp-verdict".into(), "chrome-macos".into()),
+            ("X-FP-JA4".into(), "forged".into()),
+            ("accept".into(), "*/*".into()),
+        ]);
+        assert_eq!(p.header_names, vec!["user-agent", "accept"]);
+        assert_eq!(p.header_count, 2);
     }
 
     #[test]
