@@ -28,13 +28,38 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
-      # `fingerprint-terms` denies unwrap/expect/panic outside tests; this is where
+      # `fingerprint-terms` denies unwrap/expect/panic outside tests, and this is where
       # that is enforced. Spikes live outside the workspace and are never built here.
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
         run: cargo test --workspace
+
+      # Emulation is behind a non-default feature, so `cargo test --workspace`
+      # above never touches it. Without this job the entire emulation crate,
+      # including the closed-loop verification that is the project's headline
+      # property, could break and CI would stay green.
+      - name: Clippy (emulation)
+        run: cargo clippy --workspace --all-targets --features flux-parsing-daemon/emulation -- -D warnings
+
+      - name: Test (emulation)
+        run: cargo test --workspace --features flux-parsing-daemon/emulation
+
+      # The manifests claim a minimum supported Rust version. Claiming one and
+      # never checking it is worse than not claiming one.
+      #
+      # The original claim of 1.82 was chosen during M0 without verification and
+      # was false: clap needs edition2024 (1.85), and rcgen and time need 1.88.
+      # 1.88 is the measured floor for both the default build and the emulation
+      # feature. If this fails after a dependency bump, raise the claim to
+      # whatever actually builds rather than deleting the check.
+      - name: Check the stated MSRV
+        run: |
+          MSRV=$(grep '^rust-version' Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "manifest claims MSRV $MSRV"
+          rustup toolchain install "$MSRV" --profile minimal
+          cargo +"$MSRV" check --workspace
 
       # Publishes the canonical terms hash in the job log. Any release binary whose
       # `fpd terms show --hash` differs from this is not a genuine build.
@@ -63,10 +88,20 @@ jobs:
             --fuzz-dir crates/fingerprint-core/fuzz \
             -- -max_total_time=60
 
-      # A crash leaves an artifact behind; surface it rather than losing it.
+      # The HTTP/2 target was written in M3a but never wired in here, so the
+      # frame walk and HPACK path went unfuzzed in CI despite having a target.
+      - name: Fuzz parse_preamble
+        run: |
+          cargo +nightly fuzz run parse_preamble \
+            --fuzz-dir crates/fingerprint-h2/fuzz \
+            -- -max_total_time=60
+
+      # A crash leaves an artifact behind, so surface it rather than losing it.
       - name: Upload crash artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-artifacts
-          path: crates/fingerprint-core/fuzz/artifacts/
+          path: |
+            crates/fingerprint-core/fuzz/artifacts/
+            crates/fingerprint-h2/fuzz/artifacts/

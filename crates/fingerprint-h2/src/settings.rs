@@ -19,7 +19,7 @@ pub struct Priority {
 pub fn settings_pairs(frames: &[Frame]) -> Vec<(u16, u32)> {
     let mut out = Vec::new();
     for f in frames.iter().filter(|f| f.kind == FRAME_SETTINGS) {
-        if f.payload.len() % 6 != 0 {
+        if !f.payload.len().is_multiple_of(6) {
             continue;
         }
         for c in f.payload.chunks_exact(6) {

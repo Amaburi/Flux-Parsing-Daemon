@@ -1,5 +1,5 @@
-//! The ClientHello walk. Knows the message layout; knows nothing about what any
-//! individual extension means — that is `ext`'s job.
+//! The ClientHello walk. Knows the message layout. Knows nothing about what any
+//! individual extension means, that is `ext`'s job.
 
 use crate::reader::{ParseError, Reader};
 
@@ -43,7 +43,7 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
     let _session_id = c.take(sid_len)?;
 
     let cs_len = c.u16()? as usize;
-    if cs_len % 2 != 0 {
+    if !cs_len.is_multiple_of(2) {
         return Err(ParseError::Malformed("cipher_suites length"));
     }
     let cs_bytes = c.take(cs_len)?;
@@ -148,7 +148,7 @@ mod tests {
     }
 
     /// M0 finding 2: GREASE sits at cipher[0] and at the first and last non-PSK
-    /// extension slots. Positions are asserted; values deliberately are not.
+    /// extension slots. Positions are asserted. Values deliberately are not.
     #[test]
     fn chrome_grease_positions_are_recorded_but_values_are_not_asserted() {
         let raw = fixture("chrome-macos");

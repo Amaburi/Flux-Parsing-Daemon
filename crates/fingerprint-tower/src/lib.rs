@@ -6,25 +6,39 @@
 //! `fpd serve` works with any language but costs a process and a localhost hop.
 //! A Rust application needs neither. One line changes:
 //!
-//! ```ignore
+//! ```no_run
+//! # use std::sync::Arc;
+//! # fn demo(config: Arc<rustls::ServerConfig>) {
 //! // before
-//! let acceptor = TlsAcceptor::from(config);
+//! let acceptor = tokio_rustls::TlsAcceptor::from(config.clone());
 //! // after
 //! let acceptor = fingerprint_tower::Acceptor::new(config);
+//! # }
 //! ```
 //!
 //! Then, per connection:
 //!
-//! ```ignore
+//! ```no_run
+//! # use fingerprint_tower::{Acceptor, FingerprintLayer};
+//! # use tower::{ServiceBuilder, service_fn};
+//! # async fn demo(acceptor: Acceptor, tcp: tokio::net::TcpStream)
+//! #     -> Result<(), Box<dyn std::error::Error>> {
+//! # let app = service_fn(|_: http::Request<()>| async {
+//! #     Ok::<_, std::convert::Infallible>(http::Response::new(()))
+//! # });
 //! let accepted = acceptor.accept(tcp).await?;
 //! let svc = ServiceBuilder::new()
 //!     .layer(FingerprintLayer::new(accepted.fingerprint))
 //!     .service(app);
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! and the fingerprint is in every request:
 //!
-//! ```ignore
+//! ```no_run
+//! # use axum::Extension;
+//! # use fingerprint_tower::ClientFingerprint;
 //! async fn handler(Extension(fp): Extension<ClientFingerprint>) -> String {
 //!     fp.ja4.clone()
 //! }
