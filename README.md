@@ -24,7 +24,8 @@ In development. What works today:
 | Claim mismatch | **Working.** Flags a client whose User-Agent contradicts its fingerprint. |
 | `fpd serve` | **Working.** Reverse proxy that annotates traffic for any upstream. |
 | `fingerprint-tower` | **Working.** Embedded in a Rust app, no proxy and no extra hop. |
-| `tui` `emulate` | Not implemented. Stubs. |
+| `fpd emulate --verify` | **Working**, TLS layer. Reproduces a profile and proves it. |
+| `tui` | Not implemented. Stub. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
 [the design](docs/design/2026-08-11-fpd-design.md) and [the plans](docs/plans/).
@@ -110,6 +111,41 @@ fn emulation_matches_every_shipped_profile() {
 
 No network. Runs in CI. A dependency bump that breaks emulation fails the build that
 day instead of producing a mysterious 403 three weeks later.
+
+This works today for the TLS layer:
+
+```console
+$ fpd emulate --profile chrome-macos --verify
+  ✓ ciphers         15 ciphers
+  ✓ extensions      15 extensions
+  ✓ GREASE          1 cipher, 2 extension
+  ✓ ALPN            h2
+  ✓ SNI             absent
+  verdict: matches chrome-macos
+  (TLS layer only; HTTP/2 emulation is not implemented)
+```
+
+The comparison uses the profile's own equivalence class, not byte equality. Two
+consecutive real Chrome handshakes are not identical to each other, since Chrome permutes
+its extension order every connection and its GREASE values rotate, so byte comparison
+would fail against the real browser too. A test runs eight draws to confirm the
+permutation is genuinely being exercised, and a deliberately corrupted profile is checked
+to fail, because a verification that cannot fail proves nothing.
+
+Emulation is behind a non-default feature, since it pulls in BoringSSL:
+
+```console
+$ cargo build --features emulation
+```
+
+What it does not do yet, stated so nobody discovers it late:
+
+- **HTTP/2 emulation.** SETTINGS order, WINDOW_UPDATE and pseudo-header order cannot be
+  controlled through the stock `h2` crate, so that needs a patched writer. Separate work.
+- **Certificate compression is advertised but not implemented.** The extension appears in
+  the ClientHello, which is what a fingerprint is made of, but a live server that actually
+  compresses its certificate chain will fail the connection. Fine for verifying a profile,
+  not fine for a general-purpose client.
 
 ## Two directions
 
