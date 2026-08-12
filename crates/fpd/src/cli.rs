@@ -24,8 +24,21 @@ pub enum Command {
         #[command(subcommand)]
         action: TermsAction,
     },
-    /// Reverse proxy that annotates inbound traffic  (M4)
-    Serve,
+    /// Reverse proxy that annotates inbound traffic
+    Serve {
+        /// Address to listen on
+        #[arg(long, default_value = "127.0.0.1:8443")]
+        listen: String,
+        /// Upstream application, plain HTTP
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        upstream: String,
+        /// How client IPs appear in logs: full, truncated or omitted
+        #[arg(long, default_value = "truncated")]
+        ip_mode: String,
+        /// Write the TLS certificate here
+        #[arg(long)]
+        cacert_out: Option<String>,
+    },
     /// Live fingerprint dashboard  (M6)
     Tui,
     /// Check a client against a browser profile

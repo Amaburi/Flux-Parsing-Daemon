@@ -46,7 +46,20 @@ fn main() -> ExitCode {
                 }
             }
         },
-        Some(cli::Command::Serve) => println!("serve: not yet implemented (M4)"),
+        Some(cli::Command::Serve {
+            listen,
+            upstream,
+            ip_mode,
+            cacert_out,
+        }) => {
+            let code = commands::serve::run(commands::serve::Args {
+                listen,
+                upstream,
+                ip_mode,
+                cacert_out,
+            });
+            return ExitCode::from(code);
+        }
         Some(cli::Command::Tui) => println!("tui: not yet implemented (M6)"),
         Some(cli::Command::Check {
             profile,
