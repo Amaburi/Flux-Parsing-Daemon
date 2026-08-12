@@ -6,8 +6,11 @@
 //! place a listener, a certificate or a clock appears.
 
 pub mod diff;
+pub mod inject;
 pub mod probe;
 pub mod profile;
 pub mod recording;
+pub mod replaying;
+pub mod serve;
 pub mod ua;
 pub mod verdict;

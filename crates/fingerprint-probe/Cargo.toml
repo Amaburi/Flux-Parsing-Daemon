@@ -6,8 +6,12 @@ rust-version.workspace = true
 authors.workspace = true
 
 [dependencies]
+bytes = "1.12.1"
 fingerprint-core = { version = "0.1.0", path = "../fingerprint-core" }
 fingerprint-h2 = { version = "0.1.0", path = "../fingerprint-h2" }
+http-body-util = "0.1.4"
+hyper = { version = "1.11.0", features = ["server", "client", "http1", "http2"] }
+hyper-util = { version = "0.1.20", features = ["tokio", "server", "client", "client-legacy", "http1"] }
 rcgen = "0.14.7"
 rustls = "0.23.43"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -15,7 +19,10 @@ serde_json = "1.0.151"
 thiserror = "2.0.20"
 tokio = { version = "1.53.1", features = ["net", "io-util", "rt", "rt-multi-thread", "macros", "time"] }
 tokio-rustls = "0.26.4"
+tracing = "0.1.44"
 
 [dev-dependencies]
 tempfile = "3.27.0"
+tokio = { version = "1.53.1", features = ["full"] }
 tokio-test = "0.4.5"
+tracing-subscriber = "0.3.23"
