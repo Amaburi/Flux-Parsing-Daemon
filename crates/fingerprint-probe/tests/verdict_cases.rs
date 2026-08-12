@@ -262,3 +262,93 @@ fn a_wrong_tls_layer_blocks_identification_even_when_http_matches() {
         "a wrong TLS layer must block identification regardless of score"
     );
 }
+
+// --- injected headers --------------------------------------------------------
+
+use fingerprint_probe::inject::{fp_headers, strip_inbound};
+
+fn injected(r: &ClientReport) -> Vec<(String, String)> {
+    fp_headers(r, &identify(r, &db()))
+}
+
+fn value_of<'a>(h: &'a [(String, String)], key: &str) -> Option<&'a str> {
+    h.iter().find(|(n, _)| n == key).map(|(_, v)| v.as_str())
+}
+
+#[test]
+fn injected_headers_carry_the_fingerprint_and_the_verdict() {
+    let h = injected(&report("curl"));
+    assert_eq!(
+        value_of(&h, "x-fp-ja4"),
+        Some("t13i4906h2_0d8feac7bc37_7395dae3b2f3")
+    );
+    assert_eq!(value_of(&h, "x-fp-verdict"), Some("curl-8.7.1-macos"));
+    assert_eq!(value_of(&h, "x-fp-mismatch"), Some("false"));
+    assert_eq!(
+        value_of(&h, "x-fp-h2"),
+        Some("3:100;4:10485760;2:0|1048510465|0|m,s,a,p")
+    );
+}
+
+/// Downstream must tell "fpd looked and found nothing" from "fpd was not here".
+/// An absent header cannot express the first, so the value is always present.
+#[test]
+fn an_unidentified_client_is_reported_as_unknown_rather_than_omitted() {
+    let mut r = report("curl");
+    r.tls.ciphers = vec![0x1301];
+    r.tls.extensions = vec![0x0001];
+    r.tls.grease_cipher_positions.clear();
+    r.tls.grease_ext_positions.clear();
+
+    let h = injected(&r);
+    assert_eq!(value_of(&h, "x-fp-verdict"), Some("unknown"));
+    assert_eq!(value_of(&h, "x-fp-confidence"), Some("0.00"));
+}
+
+#[test]
+fn a_lying_client_is_flagged_in_the_injected_headers() {
+    let mut r = report("curl");
+    set_header(&mut r, "user-agent", CHROME_UA);
+
+    let h = injected(&r);
+    assert_eq!(value_of(&h, "x-fp-mismatch"), Some("true"));
+    assert_eq!(value_of(&h, "x-fp-claimed"), Some("chrome"));
+}
+
+/// The privacy promise, applied to the injection path specifically.
+#[test]
+fn no_cookie_or_authorization_value_reaches_an_injected_header() {
+    let mut r = report("chrome");
+    set_header(&mut r, "cookie", "session=SECRETVALUE");
+    set_header(&mut r, "authorization", "Bearer SECRETTOKEN");
+
+    let rendered = format!("{:?}", injected(&r));
+    assert!(!rendered.contains("SECRETVALUE"), "cookie value leaked");
+    assert!(
+        !rendered.contains("SECRETTOKEN"),
+        "authorization value leaked"
+    );
+}
+
+/// End to end for the forging case: a client sends its own verdict, it is
+/// stripped, and the real one replaces it.
+#[test]
+fn a_forged_verdict_is_replaced_by_the_real_one() {
+    let mut inbound = vec![
+        ("x-fp-verdict".to_string(), "chrome-macos".to_string()),
+        ("host".to_string(), "example.com".to_string()),
+    ];
+    strip_inbound(&mut inbound);
+    inbound.extend(injected(&report("curl")));
+
+    let verdicts: Vec<&str> = inbound
+        .iter()
+        .filter(|(n, _)| n == "x-fp-verdict")
+        .map(|(_, v)| v.as_str())
+        .collect();
+    assert_eq!(
+        verdicts,
+        vec!["curl-8.7.1-macos"],
+        "exactly one, and it is ours"
+    );
+}

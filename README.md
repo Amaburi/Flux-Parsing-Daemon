@@ -22,7 +22,8 @@ In development. What works today:
 | `fpd check` | **Working.** Compares against a profile, or identifies the client. |
 | `fpd capture` | Working. Infers field ordering from repeat samples. |
 | Claim mismatch | **Working.** Flags a client whose User-Agent contradicts its fingerprint. |
-| `serve` `tui` `emulate` | Not implemented. Stubs. |
+| `fpd serve` | **Working.** Reverse proxy that annotates traffic for any upstream. |
+| `tui` `emulate` | Not implemented. Stubs. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
 [the design](docs/design/2026-08-11-fpd-design.md) and [the plans](docs/plans/).
@@ -147,6 +148,47 @@ stay identical because SNI is excluded from them.
 
 The parser is fuzzed and property tested. 672,344 fuzz executions with no crashes, plus
 truncation of every fixture at every byte offset.
+
+## Annotating your own traffic
+
+`fpd serve` sits in front of an application, terminates TLS, fingerprints each client,
+and forwards the request with the result attached as headers. No application code
+changes. Any language, any framework, read the headers with your existing logger.
+
+```console
+$ fpd serve --listen 127.0.0.1:8443 --upstream 127.0.0.1:8080
+```
+
+```
+Internet ──TLS──> fpd :8443 ──HTTP──> your app :8080
+                    |
+                    +-- x-fp-ja4:           t13i1516h2_8daaf6152771_a87ad97598a9
+                        x-fp-h2:            1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p
+                        x-fp-http-headers:  cache-control,sec-ch-ua,sec-fetch-site,...
+                        x-fp-verdict:       chrome-macos
+                        x-fp-confidence:    1.00
+                        x-fp-mismatch:      false
+```
+
+**Inbound `x-fp-*` headers from clients are stripped before injection**, without
+exception. Otherwise a caller sends its own `x-fp-verdict` and your application believes
+it, which would turn the whole mechanism into something the caller controls. There is a
+test that sends forged headers through a live proxy and asserts they never arrive.
+
+Values are always present, never omitted on failure. `x-fp-verdict: unknown` means fpd
+looked and found no match, and `unparsed` means the handshake could not be read. An
+absent header would be indistinguishable from fpd not being in the path at all.
+
+**Fingerprinting never breaks the site.** If a handshake cannot be parsed the request is
+still proxied, annotated `unparsed`. An unreachable upstream returns 502. A sidecar that
+can 500 the application it protects is worse than no sidecar.
+
+Upstream is HTTP/1.1 only in this version, which is the usual sidecar shape where the
+upstream is a local application. Client-facing HTTP/2 and HTTP/1.1 are both supported.
+
+Logging is one line per connection, at WARN when a claim mismatch is detected and INFO
+otherwise, so the level is the thing to alert on. Client IPs are truncated by default,
+and `--ip-mode` takes `full`, `truncated` or `omitted`.
 
 ## The HTTP layer is fpd's own, not JA4H
 
