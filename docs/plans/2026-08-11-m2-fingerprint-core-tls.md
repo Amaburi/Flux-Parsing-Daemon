@@ -1,6 +1,6 @@
-# fpd M2 — `fingerprint-core` TLS Parsing, JA3 and JA4 — Implementation Plan
+# fpd M2, `fingerprint-core` TLS Parsing, JA3 and JA4, Implementation Plan
 
-> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax for tracking. Every task ends at a hard stop for review and commit — see the Commit Protocol below.
+> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax for tracking. Every task ends at a hard stop for review and commit, see the Commit Protocol below.
 
 **Status: COMPLETE.** 92 workspace tests pass, clippy `-D warnings` clean, fuzzer ran
 672,344 executions with zero crashes. All three JA4 oracle values match tshark 4.4.9.
@@ -8,20 +8,20 @@ Deviations and remaining gaps are recorded at the bottom of this document.
 
 **Goal:** Turn raw ClientHello bytes into a `TlsFingerprint` carrying JA3 and JA4, with every parser tested against byte fixtures captured from real clients and hardened against malformed input.
 
-**Architecture:** A new crate `crates/fingerprint-core` containing only pure functions over `&[u8]` and structs — it never opens a socket. Byte fixtures recorded from real curl and Chrome handshakes live in-tree and drive every test, so the suite runs offline in milliseconds and each newly captured client becomes a permanent regression test.
+**Architecture:** A new crate `crates/fingerprint-core` containing only pure functions over `&[u8]` and structs, it never opens a socket. Byte fixtures recorded from real curl and Chrome handshakes live in-tree and drive every test, so the suite runs offline in milliseconds and each newly captured client becomes a permanent regression test.
 
 **Tech Stack:** Rust 2021, sha2, md-5 (JA3), hex. Dev: `proptest`, `cargo-fuzz`. No async, no I/O, no network.
 
 ## Global Constraints
 
-- `crates/fingerprint-core` carries `#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used, clippy::indexing_slicing)]`. Every parser returns `Result`; none may panic on any input.
+- `crates/fingerprint-core` carries `#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used, clippy::indexing_slicing)]`. Every parser returns `Result`. None may panic on any input.
 - **`clippy::indexing_slicing` is new in this crate and is deliberate.** Every length field in a ClientHello is attacker-controlled. `raw[p]` on an attacker-supplied offset is a panic waiting to happen, so indexing must go through `.get()`.
 - No test in this crate may open a socket, read the clock, or use randomness. Fixtures only.
 - Dependency versions come from `cargo add`, never hand-written.
 - Fixtures are committed as raw `.bin` files with a `.md` sidecar recording what produced them.
 - `clippy.toml` at the repo root already relaxes unwrap/expect/panic inside `#[cfg(test)]`.
 
-## Commit Protocol — read this before executing anything
+## Commit Protocol, read this before executing anything
 
 **The implementer never runs `git commit` or `git push`.** The repository owner commits,
 one commit per task. Every task ends at a **STOP**: confirm the task's tests pass, print
@@ -30,14 +30,14 @@ the suggested `git add` / `git commit` command, then wait. Inert git commands
 
 ---
 
-## JA4 rules — verified against the specification and an independent oracle
+## JA4 rules, verified against the specification and an independent oracle
 
 These were confirmed before the plan was finalised, against
 `github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md`, and then cross-checked
 against **tshark 4.4.9** (`tls.handshake.ja4`) over the actual fixtures. Implement to
 these, not to intuition.
 
-**Segment (a)** — `t13i4906h2`
+**Segment (a)**, `t13i4906h2`
 
 | Field | Rule |
 |---|---|
@@ -46,26 +46,26 @@ these, not to intuition.
 | SNI | `d` if extension `0x0000` present, `i` if absent |
 | Cipher count | 2-digit decimal, GREASE excluded, capped at `99`. SCSV (`0x00ff`) and reserved values **are** counted |
 | Extension count | 2-digit decimal, GREASE excluded, capped at `99`. **SNI and ALPN are counted here** |
-| ALPN | First and last ASCII-alphanumeric characters of the *first* ALPN value; hex representation if non-alphanumeric; `00` if absent or empty |
+| ALPN | First and last ASCII-alphanumeric characters of the *first* ALPN value, hex representation if non-alphanumeric, `00` if absent or empty |
 
-**Segment (b)** — 12-char truncated SHA-256 of ciphers **sorted ascending**, formatted as
+**Segment (b)**, 12-char truncated SHA-256 of ciphers **sorted ascending**, formatted as
 4-digit zero-padded **lowercase hex**, comma-delimited. GREASE excluded, other
 non-cipher values retained. Literal `000000000000` if empty.
 
-**Segment (c)** — 12-char truncated SHA-256 of extensions **sorted ascending** (same hex
+**Segment (c)**, 12-char truncated SHA-256 of extensions **sorted ascending** (same hex
 format), **excluding SNI `0000` and ALPN `0010`** since segment (a) already carries them,
 then `_`, then signature algorithms in **wire order, unsorted**. Literal
 `000000000000` if empty.
 
 ### The oracle: tshark, locally, over the exact fixture bytes
 
-`tshark` 4.4.9 exposes both `tls.handshake.ja4` and — critically —
+`tshark` 4.4.9 exposes both `tls.handshake.ja4` and, critically,
 `tls.handshake.ja4_r`, the **pre-hash strings**. A mismatch therefore says *which list*
 is wrong rather than merely that a hash differs.
 
 `scripts/bin2pcap.py` wraps a `.bin` fixture in a minimal Ethernet/IPv4/TCP pcap. The
 payload is byte-identical to the fixture, so tshark and `fingerprint-core` consume
-exactly the same bytes — the comparison has no confounder.
+exactly the same bytes, the comparison has no confounder.
 
 ```bash
 python3 scripts/bin2pcap.py crates/fingerprint-core/tests/fixtures/<name>.bin /tmp/f.pcap
@@ -110,9 +110,9 @@ crates/fingerprint-core/
     └── fuzz_targets/parse_hello.rs
 ```
 
-**Responsibility boundaries.** `reader.rs` is the only module that touches raw offsets;
+**Responsibility boundaries.** `reader.rs` is the only module that touches raw offsets,
 everything above it works in terms of already-validated slices. `hello.rs` knows the
-ClientHello layout but not what any extension *means*; `ext.rs` knows extension bodies
+ClientHello layout but not what any extension *means*. `ext.rs` knows extension bodies
 but not the outer layout. `ja3.rs` and `ja4.rs` consume the parsed structs and never see
 bytes. That split is why a fuzz finding in `reader.rs` cannot silently change a JA4.
 
@@ -133,7 +133,7 @@ so they have to be captured before anything else can be written.
 
 - [ ] **Step 1: Add a fixture-dumping binary to the existing S1 spike**
 
-`spikes/s1-recording-stream/src/bin/dump.rs` — same listener as `main.rs`, but instead
+`spikes/s1-recording-stream/src/bin/dump.rs`, same listener as `main.rs`, but instead
 of printing parsed lists it writes the recorded buffer to a file. Trim to the first TLS
 record only: read the 5-byte record header, take `5 + length` bytes, discard the rest,
 so a fixture is one ClientHello and nothing else.
@@ -177,12 +177,12 @@ Restart the dumper with `FPD_FIXTURE_LABEL=chrome-macos`, open
 `https://127.0.0.1:8443/` in Chrome, and accept the certificate warning.
 
 Expected: `~1800 bytes`. Per M0 finding 2, GREASE values in this fixture are one
-arbitrary draw and must never be asserted literally — only positions and counts.
+arbitrary draw and must never be asserted literally, only positions and counts.
 
 **Capture a resuming Chrome separately if convenient** (`chrome-macos-psk`): M0 finding 5
 showed Chrome sends 18 extensions with `pre_shared_key` on resumption versus 17 without.
 Having both makes the session-dependence explicit in the fixture set rather than a
-surprise later. Optional — do not block on it.
+surprise later. Optional, do not block on it.
 
 - [ ] **Step 4: Write the sidecars**
 
@@ -200,7 +200,7 @@ done
 Expected: each begins `160301` or `160303` (handshake record, TLS 1.0/1.2 legacy
 version), followed by the record length.
 
-- [ ] **Step 6: STOP — hand off to the owner for commit**
+- [ ] **Step 6: STOP, hand off to the owner for commit**
 
 ```bash
 git add spikes/s1-recording-stream/ crates/fingerprint-core/tests/fixtures/
@@ -228,7 +228,7 @@ fuzzing hardest.
 ```bash
 cargo new --lib --vcs none crates/fingerprint-core
 # cargo new appends the crate to workspace.members even though `members = ["crates/*"]`
-# already covers it — remove the duplicate line it adds, as in M1 Task 1.
+# already covers it, remove the duplicate line it adds, as in M1 Task 1.
 cd crates/fingerprint-core && cargo add sha2 md-5 hex && cargo add --dev proptest
 ```
 
@@ -333,7 +333,7 @@ Add `thiserror` with `cargo add thiserror`. Put `#![deny(clippy::unwrap_used, cl
 
 - [ ] **Step 5: Run to verify it passes**
 
-Run: `cargo test -p fingerprint-core reader` → 4 passed.
+Run: `cargo test -p fingerprint-core reader` maps to 4 passed.
 
 - [ ] **Step 6: Add the fixture harness**
 
@@ -359,9 +359,9 @@ fn every_fixture_is_a_handshake_record() {
 
 - [ ] **Step 7: Run and verify**
 
-Run: `cargo test -p fingerprint-core` → reader tests plus the fixture sanity check pass.
+Run: `cargo test -p fingerprint-core` maps to reader tests plus the fixture sanity check pass.
 
-- [ ] **Step 8: STOP — hand off to the owner for commit**
+- [ ] **Step 8: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/ Cargo.lock
@@ -372,7 +372,7 @@ Wait for the owner before starting Task 3.
 
 ---
 
-### Task 3: ClientHello walk — versions, session id, ciphers
+### Task 3: ClientHello walk, versions, session id, ciphers
 
 **Files:**
 - Create: `crates/fingerprint-core/src/hello.rs`
@@ -384,7 +384,7 @@ Wait for the owner before starting Task 3.
 
 - [ ] **Step 1: Write the failing tests, asserted against real fixtures**
 
-`crates/fingerprint-core/src/hello.rs` — the expected values come from the S1 capture, so
+`crates/fingerprint-core/src/hello.rs`, the expected values come from the S1 capture, so
 these are assertions about real observed traffic rather than invented data:
 
 ```rust
@@ -546,15 +546,15 @@ pub fn parse_hello(raw: &[u8]) -> Result<RawHello<'_>, ParseError> {
 ```
 
 Add `pub mod hello;` to `lib.rs`. Task 4 supplies `grease::is_grease`, so run Task 3's
-cipher-order test after Task 4 if executing strictly in order — or add the two-line
+cipher-order test after Task 4 if executing strictly in order, or add the two-line
 `grease` module now and let Task 4 test it properly.
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `cargo test -p fingerprint-core` → all hello tests pass, including the
+Run: `cargo test -p fingerprint-core` maps to all hello tests pass, including the
 truncate-at-every-offset test.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/
@@ -567,7 +567,7 @@ Wait for the owner before starting Task 4.
 
 ### Task 4: GREASE detection and normalisation
 
-M0 finding 2: GREASE **values** rotate every connection; only positions are stable.
+M0 finding 2: GREASE **values** rotate every connection. Only positions are stable.
 Every comparison and hash in this crate must normalise them first, or every Chrome
 result becomes non-deterministic.
 
@@ -656,9 +656,9 @@ pub fn positions(values: &[u16]) -> Vec<usize> {
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `cargo test -p fingerprint-core grease` → 5 passed.
+Run: `cargo test -p fingerprint-core grease` maps to 5 passed.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/
@@ -669,7 +669,7 @@ Wait for the owner before starting Task 5.
 
 ---
 
-### Task 5: Extension bodies — SNI, ALPN, signature algorithms, groups, versions
+### Task 5: Extension bodies, SNI, ALPN, signature algorithms, groups, versions
 
 **Files:**
 - Create: `crates/fingerprint-core/src/ext.rs`
@@ -817,13 +817,13 @@ pub fn negotiated_version(exts: &[RawExt], legacy: u16) -> u16 {
 }
 ```
 
-Note `unwrap_or` is permitted; `unwrap` is not.
+Note `unwrap_or` is permitted. `unwrap` is not.
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `cargo test -p fingerprint-core ext` → 6 passed.
+Run: `cargo test -p fingerprint-core ext` maps to 6 passed.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/
@@ -845,7 +845,7 @@ Wait for the owner before starting Task 6.
 Open `https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md` and check each
 of the six numbered questions in the warning section near the top of this document.
 Write the confirmed rules into this plan, replacing the from-memory versions, and note
-any that differed. **Do not start Task 7 until this is done** — implementing JA4 from an
+any that differed. **Do not start Task 7 until this is done**, implementing JA4 from an
 unverified recollection is how a fingerprint tool ends up authoritative and wrong.
 
 - [ ] **Step 2: Write the failing JA3 tests**
@@ -888,8 +888,8 @@ mod tests {
 }
 ```
 
-Note the last test is a documentation test of a known JA3 weakness — implement it only
-if a second Chrome fixture was captured in Task 1; otherwise delete it rather than
+Note the last test is a documentation test of a known JA3 weakness, implement it only
+if a second Chrome fixture was captured in Task 1. Otherwise delete it rather than
 leaving it empty.
 
 - [ ] **Step 3: Run to verify it fails**
@@ -923,10 +923,10 @@ pub fn ja3_hash(s: &str) -> String {
 cargo test -p fingerprint-core ja3
 printf '771,4865,10,29,0' | md5
 ```
-The second command's output must appear in the test's computed hash — an independent
+The second command's output must appear in the test's computed hash, an independent
 check that the implementation is really MD5 over really that string.
 
-- [ ] **Step 6: STOP — hand off to the owner for commit**
+- [ ] **Step 6: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/ docs/plans/
@@ -978,10 +978,10 @@ mod tests {
     }
 
     #[test]
-    fn absent_alpn_is_reported_as_00() { /* … */ }
+    fn absent_alpn_is_reported_as_00() { /* ... */ }
 
     #[test]
-    fn domain_target_uses_d_and_ip_target_uses_i() { /* … */ }
+    fn domain_target_uses_d_and_ip_target_uses_i() { /* ... */ }
 }
 ```
 
@@ -991,7 +991,7 @@ Step 1 revealed different count or flag rules, correct it before implementing.
 - [ ] **Step 2: Run to verify it fails.** Expected: `cannot find function ja4_a`.
 - [ ] **Step 3: Implement segment (a) per the confirmed rules.**
 - [ ] **Step 4: Run to verify it passes.**
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/
@@ -1047,7 +1047,7 @@ check, the reason JA4 replaced JA3.
 printf '1301,1302,1303' | shasum -a 256 | cut -c1-12
 ```
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/
@@ -1056,7 +1056,7 @@ git commit -m "feat(core): JA4 hashed segments and composite fingerprint"
 
 ---
 
-### Task 9: Hardening — property tests and a fuzz target
+### Task 9: Hardening, property tests and a fuzz target
 
 **Files:**
 - Create: `crates/fingerprint-core/fuzz/` (via `cargo fuzz init`), `fuzz/fuzz_targets/parse_hello.rs`
@@ -1083,7 +1083,7 @@ proptest! {
 }
 ```
 
-- [ ] **Step 2: Run — these should pass immediately if `Reader` did its job**
+- [ ] **Step 2: Run, these should pass immediately if `Reader` did its job**
 
 Run: `cargo test -p fingerprint-core proptest`
 If either fails, the failing input is a genuine bug: fix `reader.rs` or `hello.rs`, do
@@ -1121,7 +1121,7 @@ message so future runs have a baseline.
 Add a job that runs `cargo fuzz run parse_hello -- -max_total_time=60` on a nightly
 toolchain, allowed to fail on toolchain unavailability but not on a crash.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-core/ .github/
@@ -1132,28 +1132,28 @@ git commit -m "test(core): property tests and fuzz target for the ClientHello pa
 
 ## Self-Review
 
-**Spec coverage.** §6.1 `TlsFingerprint` fields → Tasks 3, 5, 8. JA3 unreliability for
-browsers → Task 6 Step 2. JA4 four-segment construction → Tasks 7–8. §6.9 GREASE
-normalisation (M0 finding 2) → Task 4. §9.1 byte fixtures → Task 1. §9.3 property tests
-→ Task 9. §9.4 fuzzing → Task 9. §10 bounds checking on attacker-controlled lengths →
+**Spec coverage.** §6.1 `TlsFingerprint` fields maps to Tasks 3, 5, 8. JA3 unreliability for
+browsers maps to Task 6 Step 2. JA4 four-segment construction maps to Tasks 7-8. §6.9 GREASE
+normalisation (M0 finding 2) maps to Task 4. §9.1 byte fixtures maps to Task 1. §9.3 property tests
+maps to Task 9. §9.4 fuzzing maps to Task 9. §10 bounds checking on attacker-controlled lengths maps to
 Task 2 `Reader` plus the truncate-at-every-offset test in Task 3.
 
 **Not in this plan.** HTTP/2 parsing, JA4H, `serve`, `check`, `capture`, the verdict
 engine, profiles. Those are M3 and M4 and get their own plans. `parse_h2_preamble` is
-deliberately absent even though S2 proved it works — M2 is TLS only, and mixing the two
+deliberately absent even though S2 proved it works, M2 is TLS only, and mixing the two
 would make the crate hard to review in one sitting.
 
-**Risks — all three from the first draft retired before finalising.**
+**Risks, all three from the first draft retired before finalising.**
 
-1. ~~JA4 rules unverified~~ — **retired.** Read from the FoxIO specification and recorded
+1. ~~JA4 rules unverified~~, **retired.** Read from the FoxIO specification and recorded
    above. The prediction `t13i4906h2` turned out correct, but three details were missing
    from the first draft and would have produced wrong hashes: hex is **4-digit
    zero-padded lowercase** (`0004`, not `4`), empty lists emit literal
    `000000000000`, and DTLS uses protocol char `d`.
-2. ~~No independent oracle~~ — **retired.** tshark 4.4.9 supports `tls.handshake.ja4`
+2. ~~No independent oracle~~, **retired.** tshark 4.4.9 supports `tls.handshake.ja4`
    and `tls.handshake.ja4_r`, and `scripts/bin2pcap.py` feeds it the exact fixture
    bytes. Oracle values are committed per fixture and asserted in Task 8.
-3. ~~No domain-SNI fixture~~ — **retired.** `curl --resolve example.com:8443:127.0.0.1`
+3. ~~No domain-SNI fixture~~, **retired.** `curl --resolve example.com:8443:127.0.0.1`
    makes the client send SNI to a local listener, producing `curl-8.7.1-macos-sni`. It
    forms a controlled pair with the IP-target fixture that isolates the SNI rules
    exactly:
@@ -1181,9 +1181,9 @@ would make the crate hard to review in one sitting.
   future tool validates checksums the script needs to compute them.
 
 **Type consistency.** `RawExt<'a> { id, body }` (Task 3) is consumed by every function in
-Task 5 — matches. `is_grease(u16) -> bool` (Task 4) is used in Task 3's cipher-order test
-and Task 5's `negotiated_version` — matches. `ParseError` (Task 2) is returned by
-`parse_hello` (Task 3) and `fingerprint` (Task 8) — matches.
+Task 5, matches. `is_grease(u16) -> bool` (Task 4) is used in Task 3's cipher-order test
+and Task 5's `negotiated_version`, matches. `ParseError` (Task 2) is returned by
+`parse_hello` (Task 3) and `fingerprint` (Task 8), matches.
 
 ---
 
@@ -1195,12 +1195,12 @@ Red-phase output for each task is preserved in `m2-tdd-log.txt`.
 
 1. **Task 4 (GREASE) was executed before Task 3 (hello walk).** Task 3's Chrome
    cipher-order test calls `grease::strip`, so the dependency ran first. The plan noted
-   the ordering problem but left it unresolved; this is the resolution.
+   the ordering problem but left it unresolved. This is the resolution.
 2. **`ec_point_formats` was added to `ext`**, which the plan did not anticipate. JA3's
    fifth field needs it. Driven out by the JA3 oracle test failing to compile.
 3. **`ja4_r` was implemented and asserted**, which the plan treated only as a debugging
    aid. Once tshark turned out to expose it, matching the pre-hash strings became a
-   far stronger check than matching hashes alone — a hash-only comparison can pass with
+   far stronger check than matching hashes alone, a hash-only comparison can pass with
    two compensating errors in the input lists.
 4. **`ja3_string` and `ja3` are both stored on `TlsFingerprint`.** Keeping the full
    string makes an oracle mismatch diagnosable without re-deriving it.
@@ -1220,7 +1220,7 @@ Red-phase output for each task is preserved in `m2-tdd-log.txt`.
 | SNI counted in (a), excluded from (c) | The `curl` / `curl-sni` controlled pair |
 | JA4 survives extension permutation | `ja4_is_stable_across_extension_permutation` |
 | JA3 does not survive permutation | `ja3_by_contrast_does_not_survive_permutation` |
-| Parser never panics | Truncation at every offset ×3 fixtures; 4 proptest properties; 672k fuzz executions |
+| Parser never panics | Truncation at every offset x3 fixtures, 4 proptest properties, 672k fuzz executions |
 
 ### Remaining gaps
 
@@ -1232,9 +1232,9 @@ Red-phase output for each task is preserved in `m2-tdd-log.txt`.
 2. **Chrome's JA4 is session-dependent.** The committed fixture is a *resuming*
    handshake (18 extensions including `pre_shared_key`), giving extension count `16`. A
    fresh handshake gives `15` and therefore a different JA4. This is a property of JA4,
-   not a defect, but M3's profile database must model it — see `chrome-macos.md`.
+   not a defect, but M3's profile database must model it, see `chrome-macos.md`.
 3. **Firefox and Safari fixtures are still absent.** Needed for M3's profile database.
-4. **`bin2pcap.py` writes zero IP/TCP checksums.** tshark dissects regardless; a
+4. **`bin2pcap.py` writes zero IP/TCP checksums.** tshark dissects regardless. A
    checksum-validating tool would need them computed.
 5. **`supported_groups` is parsed but unused outside JA3.** JA4 does not consume it. It
    is retained because M3's profile database will.

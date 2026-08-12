@@ -1,4 +1,4 @@
-# fpd M5b — HTTP/2 Emulation
+# fpd M5b, HTTP/2 Emulation
 
 > Execute task-by-task. Every task ends at a hard stop for review and commit.
 
@@ -87,8 +87,8 @@ fn static_table_entries_use_the_indexed_representation() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] STOP — commit.
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] STOP, commit.
 
 ---
 
@@ -133,8 +133,8 @@ fn pseudo_header_order_follows_the_profile() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] STOP — commit.
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] STOP, commit.
 
 ---
 
@@ -146,7 +146,7 @@ fn pseudo_header_order_follows_the_profile() {
 - [ ] Test: the full diff is clean for the Chrome profile, TLS and HTTP/2 together.
 - [ ] Remove the "TLS layer only" note from `fpd emulate` output, which becomes
       false at this point.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -154,13 +154,13 @@ fn pseudo_header_order_follows_the_profile() {
 
 - [ ] README: the verification loop now covers both layers. Remove the HTTP/2
       limitation, and state whatever remains instead of leaving the old text.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** §6.9's H2 write path → Tasks 1 and 2. The full closed loop → Task 3.
+**Spec coverage.** §6.9's H2 write path maps to Tasks 1 and 2. The full closed loop maps to Task 3.
 
 **Known risks.**
 1. **HPACK encoding shape is not part of our fingerprint.** Two encoders can produce

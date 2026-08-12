@@ -1,4 +1,4 @@
-//! Extension bodies. Knows what individual extensions mean; knows nothing about
+//! Extension bodies. Knows what individual extensions mean. Knows nothing about
 //! the outer ClientHello layout.
 
 use crate::grease::is_grease;
@@ -21,7 +21,7 @@ pub fn has_sni(exts: &[RawExt]) -> bool {
 }
 
 /// ALPN body: `list_len(2)` then repeated `{ len(1), bytes }`. Returns the first
-/// protocol only — that is all JA4 uses.
+/// protocol only, that is all JA4 uses.
 pub fn first_alpn(exts: &[RawExt]) -> Option<String> {
     let body = body_of(exts, EXT_ALPN)?;
     let mut r = Reader::new(body);
@@ -52,7 +52,7 @@ fn u16_list(body: Option<&[u8]>) -> Vec<u16> {
         .collect()
 }
 
-/// Wire order, deliberately unsorted — JA4 segment (c) appends these as they appear.
+/// Wire order, deliberately unsorted, JA4 segment (c) appends these as they appear.
 pub fn sig_algs(exts: &[RawExt]) -> Vec<u16> {
     u16_list(body_of(exts, EXT_SIG_ALGS))
 }
@@ -174,7 +174,7 @@ mod tests {
         }
     }
 
-    /// supported_versions carries GREASE too; it must not win the "highest" contest.
+    /// supported_versions carries GREASE too. It must not win the "highest" contest.
     #[test]
     fn grease_in_supported_versions_is_ignored() {
         let ext = [RawExt {

@@ -1,7 +1,7 @@
 //! The gate, exercised end-to-end through the real binary.
 //!
 //! Each case is its own process, which is why `FPD_ACCEPT_TERMS` can be tested
-//! here safely — unlike in the library's unit tests, where the environment is
+//! here safely, unlike in the library's unit tests, where the environment is
 //! process-global and shared with every other test thread.
 
 use assert_cmd::Command;

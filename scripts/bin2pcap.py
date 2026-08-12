@@ -16,7 +16,7 @@ def build(payload: bytes) -> bytes:
     tcp = struct.pack(
         ">HHIIBBHHH",
         54321,      # sport
-        443,        # dport — 443 so tshark's TLS dissector engages
+        443,        # dport, 443 so tshark's TLS dissector engages
         1, 1,       # seq, ack
         0x50,       # data offset 5 words, no options
         0x18,       # PSH | ACK

@@ -1,4 +1,4 @@
-//! `fpd check` — run a client against a local probe and diff it against a profile.
+//! `fpd check`, run a client against a local probe and diff it against a profile.
 
 use std::time::Duration;
 
@@ -48,7 +48,7 @@ pub fn run(args: Args) -> u8 {
     };
 
     let Some((program, rest)) = args.command.split_first() else {
-        eprintln!("fpd: no command given; try `fpd check --profile <name> -- curl -sk {{url}}`");
+        eprintln!("fpd: no command given. try `fpd check --profile <name> -- curl -sk {{url}}`");
         return EXIT_OPERATIONAL;
     };
 
@@ -104,14 +104,14 @@ pub fn run(args: Args) -> u8 {
             }
         };
 
-        // The client has served its purpose; do not wait on it.
+        // The client has served its purpose. Do not wait on it.
         let mut child = child;
         let _ = child.kill();
         let _ = child.wait();
 
         if report.h2.is_none() {
             eprintln!(
-                "note: no HTTP/2 preamble captured; ALPN negotiated {:?}",
+                "note: no HTTP/2 preamble captured. ALPN negotiated {:?}",
                 report.alpn
             );
         }

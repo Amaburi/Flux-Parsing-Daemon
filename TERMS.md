@@ -1,4 +1,4 @@
-# fpd — Terms of Use
+# fpd, Terms of Use
 
 fpd (Flux Parsing Daemon) measures and reproduces the TLS and HTTP/2 identity of
 network clients. These terms govern how you may use it. The software licence is a

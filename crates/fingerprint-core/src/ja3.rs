@@ -1,8 +1,8 @@
-//! JA3 — retained for compatibility, and unreliable for browsers by construction.
+//! JA3, retained for compatibility, and unreliable for browsers by construction.
 //!
 //! JA3 hashes the extension list in **wire order**. Chrome has permuted that order
 //! per connection since v110 (M0 finding 1), so a Chrome JA3 changes on every
-//! handshake. JA4 exists because of this; see `ja4`.
+//! handshake. JA4 exists because of this. See `ja4`.
 
 use crate::grease::strip;
 
@@ -14,7 +14,7 @@ fn join_u16(values: &[u16]) -> String {
         .join("-")
 }
 
-/// `version,ciphers,extensions,curves,point_formats` — decimal, dash-joined within
+/// `version,ciphers,extensions,curves,point_formats`, decimal, dash-joined within
 /// each field, GREASE removed, **wire order preserved**.
 ///
 /// `version` is the ClientHello's `legacy_version`, not the version negotiated via
@@ -96,7 +96,7 @@ mod tests {
     }
 
     /// JA3 uses the ClientHello's `legacy_version` (771 = 0x0303), *not* the version
-    /// negotiated via `supported_versions` — which is 0x0304 for both fixtures.
+    /// negotiated via `supported_versions`, which is 0x0304 for both fixtures.
     #[test]
     fn ja3_uses_legacy_version_not_the_negotiated_one() {
         let (s, _) = ja3_of("curl-8.7.1-macos");
@@ -115,15 +115,15 @@ mod tests {
         assert_eq!(s, "771,4866-4865,10,,");
     }
 
-    /// The defect, stated as an executable fact: permuting the extension order —
-    /// which Chrome does on every connection — changes the JA3.
+    /// The defect, stated as an executable fact: permuting the extension order,
+    /// which Chrome does on every connection, changes the JA3.
     #[test]
     fn permuting_extensions_changes_ja3() {
         let a = ja3_string(0x0303, &[0x1301], &[0x000a, 0x000b], &[], &[]);
         let b = ja3_string(0x0303, &[0x1301], &[0x000b, 0x000a], &[], &[]);
         assert_ne!(
             a, b,
-            "JA3 is order-sensitive; this is why it fails on Chrome"
+            "JA3 is order-sensitive, which is why it fails on Chrome"
         );
         assert_ne!(ja3_hash(&a), ja3_hash(&b));
     }

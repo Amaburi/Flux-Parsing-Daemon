@@ -1,6 +1,6 @@
-# fpd M3a — `fingerprint-h2`: Frame Walk, HPACK, and the Akamai Fingerprint
+# fpd M3a, `fingerprint-h2`: Frame Walk, HPACK, and the Akamai Fingerprint
 
-> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax. Every task ends at a hard stop for review and commit — see the Commit Protocol.
+> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax. Every task ends at a hard stop for review and commit, see the Commit Protocol.
 
 **Status: COMPLETE.** 132 workspace tests pass, clippy `-D warnings` clean, 8,611,830 fuzz
 executions with zero crashes. Both Akamai fingerprints match their tshark-derived oracle.
@@ -19,7 +19,7 @@ bottom of this document.
 - No socket, clock, or randomness in any test. Fixtures only.
 - Dependency versions via `cargo add`, never hand-written.
 - Fixtures committed as `.bin` with a `.md` sidecar carrying the tshark oracle values.
-- **Absence is signal.** `settings` is an ordered `Vec<(u16, u32)>` of what was literally on the wire. Never a map, never defaulted, never sorted — M0 S2 finding 2 measured curl sending `3,4,2` out of ascending order.
+- **Absence is signal.** `settings` is an ordered `Vec<(u16, u32)>` of what was literally on the wire. Never a map, never defaulted, never sorted, M0 S2 finding 2 measured curl sending `3,4,2` out of ascending order.
 
 ## Commit Protocol
 
@@ -35,7 +35,7 @@ confirm tests pass, print the suggested commit command, wait. Inert git commands
 1. The JA4H specification could not be retrieved in full. Only one rule was confirmed:
    the segment-a header count is *"2 digit number of headers, not counting Cookie and
    Referer"*, capped at 99.
-2. **tshark has no JA4H field at all** — `tshark -G fields | grep ja4` yields only
+2. **tshark has no JA4H field at all**, `tshark -G fields | grep ja4` yields only
    `tls.handshake.ja4`, `tls.handshake.ja4_r` and the DTLS equivalents. There is no
    local oracle.
 
@@ -44,7 +44,7 @@ result is the worst available outcome: authoritative-looking and quietly wrong. 
 gets its own slot once the spec is obtained in full and an oracle exists (FoxIO's
 reference implementation, or a newer Wireshark).
 
-**The Akamai HTTP/2 fingerprint proceeds**, because its oracle is strong — see below.
+**The Akamai HTTP/2 fingerprint proceeds**, because its oracle is strong, see below.
 
 ## The oracle, verified before this plan was written
 
@@ -108,9 +108,9 @@ silently alter a fingerprint.
 
 ### Task 1: Capture decrypted HTTP/2 preamble fixtures
 
-The M0 S2 spike printed parsed output, not bytes — the same gap M2 Task 1 had to close.
+The M0 S2 spike printed parsed output, not bytes, the same gap M2 Task 1 had to close.
 A dumper already exists at `spikes/s2-h2-replay/src/bin/dump_h2.rs`, written and proven
-during planning; it captures preface + frames through the first HEADERS frame.
+during planning. It captures preface + frames through the first HEADERS frame.
 
 Note these bytes only exist **after** TLS termination, so unlike the TLS fixtures they
 cannot be obtained with `tcpdump`.
@@ -125,14 +125,14 @@ FPD_FIXTURE_DIR=crates/fingerprint-h2/tests/fixtures \
 sleep 2 && curl -sk --http2 https://127.0.0.1:8444/ --max-time 4 -o /dev/null
 ```
 
-Expected: `wrote … (103 bytes)`, beginning `50 52 49 20 2a` (`PRI *`).
+Expected: `wrote ... (103 bytes)`, beginning `50 52 49 20 2a` (`PRI *`).
 
-- [ ] **Step 2: Capture Chrome — requires a human**
+- [ ] **Step 2: Capture Chrome, requires a human**
 
 Restart the dumper with `FPD_FIXTURE_LABEL=chrome-h2`, open `https://127.0.0.1:8444/`
 in Chrome, accept the certificate warning. Chrome's SETTINGS differ materially from
-curl's — per spec §6.1 it sends no id 3 at all, which is the contrast the whole
-fingerprint rests on. **Do not skip this**; a curl-only fixture set cannot demonstrate
+curl's, per spec §6.1 it sends no id 3 at all, which is the contrast the whole
+fingerprint rests on. **Do not skip this**. A curl-only fixture set cannot demonstrate
 the discriminating case.
 
 - [ ] **Step 3: Record oracle values in sidecars**
@@ -140,7 +140,7 @@ the discriminating case.
 For each fixture write a `.md` recording client, date, byte length, and the full tshark
 output from the oracle command above. These become the expected values in Task 5.
 
-- [ ] **Step 4: STOP — hand off for commit**
+- [ ] **Step 4: STOP, hand off for commit**
 
 ```bash
 git add spikes/s2-h2-replay/src/bin/dump_h2.rs crates/fingerprint-h2/tests/fixtures/
@@ -196,8 +196,8 @@ mod tests {
 
     /// M0 S2 finding 6: the stream identifier lives at bytes 5..9 of the frame
     /// header, not 4..8. Reading it one byte early swallows the flags byte and
-    /// yields 0x05000000 for what is really stream 1. The bug is silent — frame
-    /// boundaries stay correct — so it needs its own assertion.
+    /// yields 0x05000000 for what is really stream 1. The bug is silent, frame
+    /// boundaries stay correct, so it needs its own assertion.
     #[test]
     fn headers_frame_is_stream_one_with_end_stream_and_end_headers() {
         let raw = fixture("curl-8.7.1-h2");
@@ -286,7 +286,7 @@ pub fn parse_preamble(raw: &[u8]) -> Result<Vec<Frame<'_>>, H2Error> {
 ```
 
 - [ ] **Step 5: Run to verify it passes.**
-- [ ] **Step 6: STOP — commit**
+- [ ] **Step 6: STOP, commit**
 
 ```bash
 git add crates/fingerprint-h2/ Cargo.lock
@@ -304,7 +304,7 @@ git commit -m "feat(h2): connection preface and frame header walk"
 - [ ] **Step 1: Write the failing tests against the oracle**
 
 ```rust
-/// Oracle: tshark reports `http2.settings.id` as `3,4,2` — NOT ascending. Order is
+/// Oracle: tshark reports `http2.settings.id` as `3,4,2`, NOT ascending. Order is
 /// signal, so this asserts the sequence, not a set.
 #[test]
 fn curl_settings_are_in_wire_order_not_sorted() {
@@ -350,9 +350,9 @@ fn a_settings_payload_that_is_not_a_multiple_of_six_is_ignored_not_panicked_on()
 ```
 
 - [ ] **Step 2: Run to verify it fails.**
-- [ ] **Step 3: Implement.** SETTINGS payload is repeated `id(2) value(4)`; WINDOW_UPDATE is `R+increment(4)`; PRIORITY is `stream_dep(4) weight(1)`.
+- [ ] **Step 3: Implement.** SETTINGS payload is repeated `id(2) value(4)`, WINDOW_UPDATE is `R+increment(4)`, PRIORITY is `stream_dep(4) weight(1)`.
 - [ ] **Step 4: Run to verify it passes.**
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-h2/
@@ -374,13 +374,13 @@ The hardest task in this milestone, and the one tshark validates most directly.
 Use an existing HPACK crate (`cargo add hpack` or `fluke-hpack`) rather than hand-rolling
 Huffman. Requirements, both of which must be verified before committing to the choice:
 **it must preserve header order** (order is the fingerprint) and it must not panic on
-malformed input — wrap it if it does. Record the chosen crate and version here.
+malformed input, wrap it if it does. Record the chosen crate and version here.
 
 - [ ] **Step 2: Write the failing tests**
 
 ```rust
 /// Oracle: tshark `http2.header.name` reports exactly this order for the curl
-/// fixture. Order is the whole point — a decoder that returns a map is unusable.
+/// fixture. Order is the whole point, a decoder that returns a map is unusable.
 #[test]
 fn curl_header_names_match_the_oracle_in_order() {
     let raw = fixture("curl-8.7.1-h2");
@@ -402,7 +402,7 @@ fn curl_pseudo_header_order_is_msap() {
 }
 
 /// Chrome orders pseudo-headers m,a,s,p. Claiming to be Chrome with curl's
-/// ordering is caught on the first request — this is the discriminator.
+/// ordering is caught on the first request, this is the discriminator.
 #[test]
 fn chrome_pseudo_header_order_differs_from_curl() {
     let raw = fixture("chrome-h2");
@@ -418,14 +418,14 @@ fn a_malformed_headers_payload_yields_an_empty_list_not_a_panic() {
 }
 ```
 
-**If the Chrome assertion fails**, do not adjust it to match — capture what Chrome
+**If the Chrome assertion fails**, do not adjust it to match, capture what Chrome
 actually sent, check it against tshark, and correct the expectation only if tshark
 agrees. A test edited to match a buggy implementation is worse than no test.
 
 - [ ] **Step 3: Run to verify it fails.**
 - [ ] **Step 4: Implement.**
 - [ ] **Step 5: Run to verify it passes.**
-- [ ] **Step 6: STOP — commit**
+- [ ] **Step 6: STOP, commit**
 
 ```bash
 git add crates/fingerprint-h2/ Cargo.lock
@@ -478,8 +478,8 @@ fn absent_priority_frames_render_as_zero() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-h2/
@@ -492,14 +492,14 @@ git commit -m "feat(h2): Akamai fingerprint composition"
 
 **Files:** `crates/fingerprint-h2/tests/properties.rs`, `fuzz/fuzz_targets/parse_preamble.rs`, `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Property tests** — mirror `fingerprint-core`'s: arbitrary bytes never
-  panic; preface-prefixed garbage never panics (this reaches far deeper than random
-  noise); single-byte corruption of a real preamble never panics; lying frame lengths
+- [ ] **Step 1: Property tests**, mirror `fingerprint-core`'s: arbitrary bytes never
+  panic. Preface-prefixed garbage never panics (this reaches far deeper than random
+  noise), single-byte corruption of a real preamble never panics, lying frame lengths
   never over-read.
-- [ ] **Step 2: Run.** If any fail, the input is a real bug — fix the parser, never the test.
-- [ ] **Step 3: Fuzz target** seeded from the fixtures; run 90s locally; record executions.
+- [ ] **Step 2: Run.** If any fail, the input is a real bug, fix the parser, never the test.
+- [ ] **Step 3: Fuzz target** seeded from the fixtures, run 90s locally, record executions.
 - [ ] **Step 4: Add to the existing CI fuzz job** as a second target.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-h2/ .github/
@@ -511,11 +511,11 @@ git commit -m "test(h2): property tests and fuzz target for the preamble parser"
 ## Self-Review
 
 **Spec coverage.** §6.1 `H2Fingerprint` and the absence-is-signal / order-is-signal rules
-→ Tasks 3 and 5. §6.2 minimal h2 read path → Tasks 2–4. §9.3 property tests, §9.4 fuzzing
-→ Task 6. §10 bounds checking → `Reader` reuse plus truncation tests throughout.
+maps to Tasks 3 and 5. §6.2 minimal h2 read path maps to Tasks 2-4. §9.3 property tests, §9.4 fuzzing
+maps to Task 6. §10 bounds checking maps to `Reader` reuse plus truncation tests throughout.
 
 **Deliberately excluded.** JA4H (see the scope decision above). `RecordingStream`,
-profile database, diff engine, `fpd check`, `fpd capture` — those are M3b, which is the
+profile database, diff engine, `fpd check`, `fpd capture`, those are M3b, which is the
 first milestone with a user-facing command and needs its own plan.
 
 **Known risks.**
@@ -525,8 +525,8 @@ first milestone with a user-facing command and needs its own plan.
 2. **The HPACK crate is an unvetted dependency.** Task 4 Step 1 requires verifying order
    preservation and panic-freedom before adopting it. If neither holds, hand-rolling
    HPACK is a milestone of its own, not an afternoon.
-3. **The Akamai format has no single normative specification** the way JA4 does — it is a
-   de-facto format. The component values are oracle-validated; the assembly is asserted
+3. **The Akamai format has no single normative specification** the way JA4 does, it is a
+   de-facto format. The component values are oracle-validated. The assembly is asserted
    against the shape used consistently in the literature and in spec §6.1. If a
    discrepancy with another tool ever appears, the components are trustworthy and the
    separator convention is the thing to re-check.

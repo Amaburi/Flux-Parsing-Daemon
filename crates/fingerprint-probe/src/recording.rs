@@ -46,7 +46,7 @@ impl<S: AsyncRead + Unpin> AsyncRead for RecordingStream<S> {
                 let cap = self.cap;
                 if let Ok(mut g) = self.seen.lock() {
                     // Record up to the cap and then stop. The caller still receives
-                    // every byte; only our copy is bounded.
+                    // every byte. Only our copy is bounded.
                     let room = cap.saturating_sub(g.len());
                     if room > 0 {
                         g.extend_from_slice(new.get(..room.min(new.len())).unwrap_or_default());

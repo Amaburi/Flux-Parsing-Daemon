@@ -1,4 +1,4 @@
-# fpd M3b — The Probe, the Profile Database, and `fpd check`
+# fpd M3b, The Probe, the Profile Database, and `fpd check`
 
 > Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax. Every task ends at a hard stop for review and commit.
 
@@ -156,7 +156,7 @@ Three behaviours the S1 spike proved are worth preserving deliberately:
   the surface minimal.
 
 - [ ] **Step 6: Run to verify it passes.**
-- [ ] **Step 7: STOP — commit**
+- [ ] **Step 7: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/ Cargo.toml Cargo.lock
@@ -250,7 +250,7 @@ differs from a fresh Chrome handshake. Add `"session": "resumed"` and make Task 
 extension 41 as session-dependent.
 
 - [ ] **Step 5: Run to verify it passes.**
-- [ ] **Step 6: STOP — commit**
+- [ ] **Step 6: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/
@@ -359,7 +359,7 @@ fn a_clean_diff_lists_every_field_it_checked() {
   Apply `equivalence` per field. Treat extension 41 as session-dependent. Compare the
   Akamai components individually so the diff can name which one differs.
 - [ ] **Step 4: Run to verify it passes.**
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/
@@ -444,7 +444,7 @@ invocation must not look the same to CI.
 - [ ] **Step 4: Implement.** Bind the probe, spawn the child with substitution and env,
   accept one connection, diff, render, exit.
 - [ ] **Step 5: Run to verify it passes.**
-- [ ] **Step 6: STOP — commit**
+- [ ] **Step 6: STOP, commit**
 
 ```bash
 git add crates/fpd/ crates/fingerprint-probe/
@@ -461,7 +461,7 @@ git commit -m "feat(fpd): check command with field-level diff and CI exit codes"
 
 ```rust
 #[test]
-fn capture_writes_a_profile_that_the_db_can_load_back() { /* … */ }
+fn capture_writes_a_profile_that_the_db_can_load_back() { /* ... */ }
 
 /// Repeat samples are what turn a guess about equivalence into an observation.
 #[test]
@@ -481,8 +481,8 @@ That last test matters more than it looks. One handshake is not evidence of stab
 and a profile that asserts `fixed` on one sample would reject the same browser on its
 next connection.
 
-- [ ] **Step 2–4:** red, implement `capture --label --samples N`, green.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 2-4:** red, implement `capture --label --samples N`, green.
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fpd/ crates/fingerprint-probe/
@@ -507,7 +507,7 @@ it is reachable from a socket, so it should not carry further.
   HPACK, removing the split documented in the M3a plan.
 - [ ] **Step 4: Verify** the pinned regression test still passes for the right reason,
   which is now that no panic occurs rather than that one is caught.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ---
 
@@ -516,15 +516,15 @@ it is reachable from a socket, so it should not carry further.
 - [ ] Update the README status table, and add a `fpd check` usage example with real output.
 - [ ] Document the profile format and how to contribute a profile.
 - [ ] Note in the README that `check` covers TLS and HTTP/2 but not the HTTP layer, since JA4H is not implemented.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** §6.2 `RecordingStream` → Task 1. §6.3 profile database with full
-ordered fields → Task 2. §6.9 equivalence classes → Tasks 2 and 3. §6.8 `fpd check` and
-CI exit codes → Task 4. `fpd capture --samples` → Task 5. §10 resource bounds → Task 1's
+**Spec coverage.** §6.2 `RecordingStream` maps to Task 1. §6.3 profile database with full
+ordered fields maps to Task 2. §6.9 equivalence classes maps to Tasks 2 and 3. §6.8 `fpd check` and
+CI exit codes maps to Task 4. `fpd capture --samples` maps to Task 5. §10 resource bounds maps to Task 1's
 recording cap and Task 4's timeouts.
 
 **Deliberately excluded.** JA4H, still without a specification or an oracle. `serve`,

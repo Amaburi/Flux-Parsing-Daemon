@@ -1,4 +1,4 @@
-//! `fpd serve` — reverse proxy that annotates inbound traffic.
+//! `fpd serve`, reverse proxy that annotates inbound traffic.
 
 use std::net::SocketAddr;
 
@@ -33,7 +33,7 @@ pub fn run(args: Args) -> u8 {
         "truncated" => IpMode::Truncated,
         "omitted" => IpMode::Omitted,
         other => {
-            eprintln!("fpd: bad --ip-mode `{other}`; use full, truncated or omitted");
+            eprintln!("fpd: bad --ip-mode `{other}`. use full, truncated or omitted");
             return 2;
         }
     };

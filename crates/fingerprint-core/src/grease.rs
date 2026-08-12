@@ -1,6 +1,6 @@
 //! GREASE (RFC 8701) detection and normalisation.
 //!
-//! M0 finding 2: GREASE *values* rotate every connection; only positions are
+//! M0 finding 2: GREASE *values* rotate every connection. Only positions are
 //! stable. Every comparison and hash in this crate normalises them first, or
 //! every Chrome result becomes non-deterministic.
 

@@ -25,3 +25,8 @@ GEMINI.md
 .env
 .env.*
 !.env.example
+
+# Reference material belonging to third parties. JA4H is patent pending and
+# licensed under FoxIO License 1.1, so a copy does not belong in a public repo
+# even though reading it locally is fine.
+docs/reference/

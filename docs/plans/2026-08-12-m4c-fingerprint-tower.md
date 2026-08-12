@@ -1,4 +1,4 @@
-# fpd M4c — `fingerprint-tower`
+# fpd M4c, `fingerprint-tower`
 
 > Execute task-by-task. Every task ends at a hard stop for review and commit.
 
@@ -47,8 +47,8 @@ let acceptor = fingerprint_tower::Acceptor::new(config);
 - [ ] Capture path identical to `serve`: tee, handshake, capture preamble when ALPN is h2, wrap in `Replaying` so hyper sees the bytes it expects.
 - [ ] `ClientFingerprint` is `Clone` and cheap, because it is cloned into every request on the connection. The full `ClientReport` sits behind an `Arc` for callers who want the detail.
 - [ ] **A handshake that fails must return an error, not a fingerprint.** Unlike the probe, there is no connection left to serve, so there is nothing useful to hand back.
-- [ ] Tests: a real curl connection through the acceptor yields the committed JA4 oracle; an h2 connection is still fully serveable afterwards; a client that never completes the handshake errors rather than hanging.
-- [ ] STOP — commit.
+- [ ] Tests: a real curl connection through the acceptor yields the committed JA4 oracle, an h2 connection is still fully serveable afterwards, a client that never completes the handshake errors rather than hanging.
+- [ ] STOP, commit.
 
 ---
 
@@ -59,8 +59,8 @@ let acceptor = fingerprint_tower::Acceptor::new(config);
 **Interfaces:** `FingerprintLayer::new(ClientFingerprint)`, `FingerprintService<S>`.
 
 - [ ] Inserts the fingerprint into `req.extensions_mut()` and calls the inner service.
-- [ ] Tests: the extension is present in the handler; it survives across several requests on one connection, since HTTP/2 multiplexes and the fingerprint is per connection rather than per request.
-- [ ] STOP — commit.
+- [ ] Tests: the extension is present in the handler. It survives across several requests on one connection, since HTTP/2 multiplexes and the fingerprint is per connection rather than per request.
+- [ ] STOP, commit.
 
 ---
 
@@ -76,7 +76,7 @@ should prove the actual thing a user will write.
 - [ ] Assert a lying User-Agent surfaces as a mismatch inside the handler.
 - [ ] **Assert no extra process and no extra listener exist**, which is the whole point:
       one bind, one process.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -85,13 +85,13 @@ should prove the actual thing a user will write.
 - [ ] README: the embedded option, next to `serve`, with the trade-off stated plainly.
       `serve` is any language and costs a hop. `tower` is Rust only and costs nothing.
 - [ ] Status table.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** §6.6 `fingerprint-tower` and the one-line change → Tasks 1 and 2.
+**Spec coverage.** §6.6 `fingerprint-tower` and the one-line change maps to Tasks 1 and 2.
 
 **Known risks.**
 1. **A per-connection fingerprint on a multiplexed protocol.** HTTP/2 carries many

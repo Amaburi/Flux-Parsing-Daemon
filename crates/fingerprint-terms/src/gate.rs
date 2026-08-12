@@ -10,7 +10,7 @@ use std::path::Path;
 /// accepted at all. An allowlist, so anything new fails closed.
 const CARVE_OUT_COMMANDS: &[&str] = &["terms"];
 
-/// Flags exempt from the gate. All are inert — none opens a socket.
+/// Flags exempt from the gate. All are inert, none opens a socket.
 const CARVE_OUT_FLAGS: &[&str] = &["--help", "-h", "--version", "-V"];
 
 /// True when this invocation must be blocked pending acceptance.
@@ -52,7 +52,7 @@ pub fn env_accepted() -> bool {
 
 /// Gate check with the environment decision passed in explicitly.
 ///
-/// `env_accepted` is an acceptance *mechanism* for CI, not an exemption — callers
+/// `env_accepted` is an acceptance *mechanism* for CI, not an exemption, callers
 /// record it to the history log exactly as they record an interactive acceptance.
 pub fn check_with(dir: &Path, env_accepted: bool) -> Result<(), GateRefusal> {
     if env_accepted {
@@ -86,7 +86,7 @@ mod tests {
         }
     }
 
-    /// A subcommand added in a later milestone is gated by default — the carve-out
+    /// A subcommand added in a later milestone is gated by default, the carve-out
     /// list is an allowlist, so forgetting to add something fails closed.
     #[test]
     fn an_unknown_future_subcommand_is_gated_by_default() {
@@ -123,7 +123,7 @@ mod tests {
     }
 
     /// `FPD_ACCEPT_TERMS=1` satisfies the gate for CI. Tested through the pure
-    /// parameter here; the real environment variable is exercised end-to-end in the
+    /// parameter here. The real environment variable is exercised end-to-end in the
     /// binary's integration tests, where each run is its own process and cannot
     /// race other tests.
     #[test]

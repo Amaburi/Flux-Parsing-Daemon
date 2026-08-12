@@ -1,6 +1,6 @@
 //! Where the acceptance record lives on disk, and how it is read back.
 //!
-//! This module knows paths and I/O but nothing about HMAC; `record` knows HMAC but
+//! This module knows paths and I/O but nothing about HMAC. `record` knows HMAC but
 //! nothing about the filesystem. That split is why the forgery tests need no disk
 //! and the path tests need no crypto.
 
@@ -42,7 +42,7 @@ pub fn save(dir: &Path, r: &AcceptanceRecord) -> Result<(), TermsError> {
 ///
 /// Missing, unreadable, malformed, and unverifiable all collapse to the same
 /// answer: **not accepted**. There is no failure mode in which removing or
-/// corrupting a file grants access — deletion locks the user out instead.
+/// corrupting a file grants access, deletion locks the user out instead.
 pub fn load(dir: &Path) -> Option<AcceptanceRecord> {
     let bytes = std::fs::read(record_path(dir)).ok()?;
     let r: AcceptanceRecord = serde_json::from_slice(&bytes).ok()?;

@@ -1,4 +1,4 @@
-# fpd M5a — Verified TLS Emulation
+# fpd M5a, Verified TLS Emulation
 
 > Execute task-by-task. Every task ends at a hard stop for review and commit.
 
@@ -84,7 +84,7 @@ passes. The diff engine already encodes both rules and is reused rather than rei
       **not** in `default`.
 - [ ] Test: the crate builds with the feature off and exposes nothing.
 - [ ] Test: it builds with the feature on.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -121,12 +121,12 @@ fn the_chrome_profile_produces_a_cipher_list_in_its_stored_order() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green. Apply the five extension calls from the table
+- [ ] **Step 2-4:** red, implement, green. Apply the five extension calls from the table
       above, plus `set_grease_enabled` and `set_permute_extensions` when the profile's
       extension order is `permuted`.
 - [ ] **ALPS needs unsafe FFI.** Isolate it in one function with a comment naming why, so
       the unsafe block is auditable rather than scattered.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -177,8 +177,8 @@ async fn a_profile_the_client_cannot_reproduce_fails_verification() {
 differ, since that list is the honest state of the emulation, and the S3 spike predicted
 exactly five. A verification loosened until it passes is worse than none.
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] STOP — commit.
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] STOP, commit.
 
 ---
 
@@ -189,7 +189,7 @@ exactly five. A verification loosened until it passes is worse than none.
 - [ ] Exit 0 on equivalence, 1 on difference, 2 on operational failure, matching `check`.
 - [ ] Integration test through the real binary, including that the terms gate still
       refuses it without acceptance.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -199,14 +199,14 @@ exactly five. A verification loosened until it passes is worse than none.
       exercised.
 - [ ] README: the verification loop, with real output, and the honest state of which
       fields reproduce.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** §6.9 emulation, the equivalence classes, and `--verify` → Tasks 2 to 4.
-§4.2's non-default feature → Task 1.
+**Spec coverage.** §6.9 emulation, the equivalence classes, and `--verify` maps to Tasks 2 to 4.
+§4.2's non-default feature maps to Task 1.
 
 **Known risks.**
 1. **The five extensions may not all land.** S3 confirmed each has an API but did not

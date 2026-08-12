@@ -1,4 +1,4 @@
-# fpd M4a — The Verdict Engine and Claim Mismatch
+# fpd M4a, The Verdict Engine and Claim Mismatch
 
 > Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax. Every task ends at a hard stop for review and commit.
 
@@ -128,7 +128,7 @@ change can see why.
 - [ ] **Step 2: Run to verify it fails.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run to verify it passes.**
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/
@@ -201,9 +201,9 @@ fn the_chrome_fixture_user_agent_classifies_as_chrome() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green. Match Edge before Chrome, and Chrome before
+- [ ] **Step 2-4:** red, implement, green. Match Edge before Chrome, and Chrome before
   Safari, since each later family's token appears in the earlier one's string.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/
@@ -284,8 +284,8 @@ fn no_header_value_other_than_user_agent_is_read() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] **Step 5: STOP, commit**
 
 ```bash
 git add crates/fingerprint-probe/
@@ -327,8 +327,8 @@ fn check_with_a_profile_still_compares_against_it() {
 }
 ```
 
-- [ ] **Step 2–4:** red, implement, green.
-- [ ] **Step 5: STOP — commit**
+- [ ] **Step 2-4:** red, implement, green.
+- [ ] **Step 5: STOP, commit**
 
 ---
 
@@ -339,7 +339,7 @@ has nothing to compare a claim against.
 
 - [ ] Add `family` to `Profile`, regenerate both shipped profiles, assert every profile
       in the database has one.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
@@ -350,13 +350,13 @@ has nothing to compare a claim against.
       worse than no claim.
 - [ ] Document `check` without `--profile`, and mismatch detection, with real output.
 - [ ] Update the status table.
-- [ ] STOP — commit.
+- [ ] STOP, commit.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** §6.4 verdict engine, exact/partial/unknown, and `ua_mismatch` → Tasks
+**Spec coverage.** §6.4 verdict engine, exact/partial/unknown, and `ua_mismatch` maps to Tasks
 1 to 3. The claim in §6.4 that mismatch has a near-zero false-positive rate is what
 Task 2's conservatism and Task 3's three negative tests exist to earn.
 

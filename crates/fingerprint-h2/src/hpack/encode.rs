@@ -204,7 +204,7 @@ mod tests {
     /// do and what keeps short values readable on the wire.
     #[test]
     fn huffman_is_used_only_when_it_is_shorter() {
-        // Round-trip is what matters; this pins the decision rather than a length.
+        // Round-trip is what matters. This pins the decision rather than a length.
         for value in ["a", "example.com", "\u{fffd}"] {
             let h = vec![("x".to_string(), value.to_string())];
             assert_eq!(decode(&encode_headers(&h)).expect("decode"), h, "{value}");

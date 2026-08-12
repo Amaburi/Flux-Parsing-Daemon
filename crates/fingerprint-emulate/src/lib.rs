@@ -24,7 +24,7 @@
 //! Chrome permutes extension order per connection and its GREASE values rotate.
 //! Verification therefore asserts equivalence under the profile's own stated
 //! class rather than byte equality. Comparing literally makes every Chrome
-//! verification flake; comparing too loosely lets a wrong handshake pass.
+//! verification flake. Comparing too loosely lets a wrong handshake pass.
 
 pub mod ciphers;
 
@@ -47,6 +47,6 @@ pub enum EmulateError {
     Io(#[from] std::io::Error),
     #[error("the probe captured nothing")]
     NoCapture,
-    #[error("emulation support was not compiled in; build with --features emulation")]
+    #[error("emulation support was not compiled in. build with --features emulation")]
     NotCompiledIn,
 }

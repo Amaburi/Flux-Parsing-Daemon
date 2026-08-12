@@ -1,6 +1,6 @@
 //! Property and robustness tests over the public API.
 //!
-//! The parser consumes attacker-controlled length fields; the contract is that no
+//! The parser consumes attacker-controlled length fields. The contract is that no
 //! input, however malformed, may panic.
 
 use fingerprint_core::{hello::parse_hello, ja4};
@@ -18,7 +18,7 @@ const FIXTURES: &[&str] = &["curl-8.7.1-macos", "curl-8.7.1-macos-sni", "chrome-
 // --- ja4_r: the pre-hash strings, checked against tshark ---------------------
 
 /// tshark's `tls.handshake.ja4_r` for these exact bytes. Matching this means our
-/// intermediate lists — not merely the final hash — agree with an independent
+/// intermediate lists, not merely the final hash, agree with an independent
 /// implementation. A hash-only check could pass with two compensating errors.
 #[test]
 fn ja4_r_matches_the_tshark_oracle() {

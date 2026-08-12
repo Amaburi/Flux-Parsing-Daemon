@@ -2,7 +2,7 @@
 //!
 //! This is the only module in the crate that touches raw offsets. Every length
 //! field in a ClientHello is attacker-controlled, so `raw[i]` is a panic waiting
-//! to happen — everything above this layer works on already-validated slices.
+//! to happen, everything above this layer works on already-validated slices.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ParseError {

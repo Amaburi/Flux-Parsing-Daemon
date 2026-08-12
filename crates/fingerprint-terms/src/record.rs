@@ -1,6 +1,6 @@
 //! The acceptance record: what a user accepted, when, and a tamper-evidence tag.
 //!
-//! Pure logic — this module never touches the filesystem, which is what lets the
+//! Pure logic, this module never touches the filesystem, which is what lets the
 //! forgery tests below run with no I/O at all.
 
 use hmac::{Hmac, Mac};
@@ -10,7 +10,7 @@ use sha2::Sha256;
 /// Key compiled into the binary.
 ///
 /// This provides tamper-*evidence* against hand-editing the record file. It is
-/// deliberately not claimed to be secret from anyone holding the binary — spec
+/// deliberately not claimed to be secret from anyone holding the binary, spec
 /// §4.3 states that limit explicitly rather than overselling it.
 const RECORD_KEY: &[u8] = b"fpd-acceptance-v1-9a3f2c7e41b8";
 

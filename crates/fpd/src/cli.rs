@@ -2,7 +2,7 @@
 //!
 //! Subcommands for later milestones are declared here from the start, so the gate
 //! tests enumerate real commands rather than a list that grows later. None of them
-//! contains gate logic — the check happens once, in `main`, before clap runs.
+//! contains gate logic, the check happens once, in `main`, before clap runs.
 
 use clap::{Parser, Subcommand};
 
@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "fpd",
     version,
-    about = "Flux Parsing Daemon — TLS/HTTP-2 fingerprint inspection and verified emulation"
+    about = "Flux Parsing Daemon, TLS/HTTP-2 fingerprint inspection and verified emulation"
 )]
 pub struct Cli {
     #[command(subcommand)]

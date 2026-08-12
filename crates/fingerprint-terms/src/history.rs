@@ -9,7 +9,7 @@ pub fn history_path(dir: &Path) -> PathBuf {
     dir.join("terms-history.jsonl")
 }
 
-/// Opens in append mode only — never truncates, never rewrites. `source` records
+/// Opens in append mode only, never truncates, never rewrites. `source` records
 /// how acceptance was given (`interactive`, `env`), so a CI acceptance leaves the
 /// same audit trail as one typed by a human.
 pub fn append(dir: &Path, r: &AcceptanceRecord, source: &str) -> Result<(), TermsError> {
@@ -46,7 +46,7 @@ mod tests {
         assert!(lines[1].contains(r#""source":"env""#));
     }
 
-    /// `FPD_ACCEPT_TERMS=1` is an acceptance mechanism, not an exemption — it must
+    /// `FPD_ACCEPT_TERMS=1` is an acceptance mechanism, not an exemption, it must
     /// leave the same audit trail an interactive acceptance does.
     #[test]
     fn the_acceptance_source_is_recorded() {

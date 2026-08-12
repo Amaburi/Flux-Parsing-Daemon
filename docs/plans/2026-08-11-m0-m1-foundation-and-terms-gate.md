@@ -1,25 +1,25 @@
-# fpd M0 + M1 — Risk Spikes and the Terms Gate — Implementation Plan
+# fpd M0 + M1, Risk Spikes and the Terms Gate, Implementation Plan
 
-> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax for tracking. Every task ends at a hard stop for review and commit — see the Commit Protocol below.
+> Execute task-by-task, in order. Steps use checkbox (`- [ ]`) syntax for tracking. Every task ends at a hard stop for review and commit, see the Commit Protocol below.
 
 **Goal:** Answer the three go/no-go risk questions from spec §11 M0, then build the terms-acceptance gate that every later feature will sit behind.
 
-**Architecture:** A Cargo workspace at `~/fpd`. Throwaway spike crates live in `spikes/` and are excluded from the workspace so they never reach CI. The gate ships as `crates/fingerprint-terms` (embedded terms text, signed acceptance record, append-only history) consumed by the `fpd` binary in `crates/fpd`. The gate check runs on raw `argv` **before** clap parsing, so no subcommand — not even argument validation — executes without acceptance.
+**Architecture:** A Cargo workspace at `~/fpd`. Throwaway spike crates live in `spikes/` and are excluded from the workspace so they never reach CI. The gate ships as `crates/fingerprint-terms` (embedded terms text, signed acceptance record, append-only history) consumed by the `fpd` binary in `crates/fpd`. The gate check runs on raw `argv` **before** clap parsing, so no subcommand, not even argument validation, executes without acceptance.
 
 **Tech Stack:** Rust 2021, tokio, clap 4 (derive), serde/serde_json, sha2, hmac, directories, time. Spikes only: tokio-rustls, rustls, rcgen, hyper, h2, boring. Dev: assert_cmd, tempfile, predicates.
 
 ## Global Constraints
 
-- Rust edition 2021. Toolchain `stable` (1.91.1 at time of writing). `rust-version` in `Cargo.toml` is a provisional floor, not a verified MSRV — do not pin the toolchain channel to it, because modern transitive dependencies require far newer compilers than the floor suggests.
-- Dependency versions are resolved with `cargo add`, never hand-written. Version numbers appearing in this plan's code blocks are illustrative; the resolved `Cargo.toml` is the source of truth.
-- Package name on crates.io is `flux-parsing-daemon`; the installed binary is `fpd`. The crates.io name `fpd` is taken (Fiberplane Daemon v2.7.2) and is not available.
-- `crates/fingerprint-terms` carries `#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used)]`. Library code returns `Result`; it never panics.
-- No test in the workspace may open a network socket. Spikes are exempt — they are excluded from the workspace.
+- Rust edition 2021. Toolchain `stable` (1.91.1 at time of writing). `rust-version` in `Cargo.toml` is a provisional floor, not a verified MSRV, do not pin the toolchain channel to it, because modern transitive dependencies require far newer compilers than the floor suggests.
+- Dependency versions are resolved with `cargo add`, never hand-written. Version numbers appearing in this plan's code blocks are illustrative. The resolved `Cargo.toml` is the source of truth.
+- Package name on crates.io is `flux-parsing-daemon`. The installed binary is `fpd`. The crates.io name `fpd` is taken (Fiberplane Daemon v2.7.2) and is not available.
+- `crates/fingerprint-terms` carries `#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used)]`. Library code returns `Result`. It never panics.
+- No test in the workspace may open a network socket. Spikes are exempt, they are excluded from the workspace.
 - The terms text is **never read from the filesystem at runtime**. `include_str!` only. A test enforces this (Task 9).
-- The acceptance record is HMAC-tagged with a key compiled into the binary. This is tamper-*evidence* against hand-editing, not cryptography against a determined attacker who has the binary — spec §4.3 states this limit and the plan does not overclaim it.
+- The acceptance record is HMAC-tagged with a key compiled into the binary. This is tamper-*evidence* against hand-editing, not cryptography against a determined attacker who has the binary, spec §4.3 states this limit and the plan does not overclaim it.
 - Config directory is overridable via `FPD_CONFIG_DIR` so tests never touch the real user config.
 
-## Commit Protocol — read this before executing anything
+## Commit Protocol, read this before executing anything
 
 **The implementer never runs `git commit` or `git push`.** The repository owner commits,
 and wants one commit per task so the history is readable rather than a single bulk
@@ -39,7 +39,7 @@ Inert git commands (`git init`, `git status`, `git diff`, `git log`) are fine to
 fpd/
 ├── Cargo.toml                         # workspace; excludes spikes/
 ├── TERMS.md                           # canonical terms text (Task 2)
-├── LICENSE                            # Task 10 — blocked on licence decision
+├── LICENSE                            # Task 10, blocked on licence decision
 ├── NOTICE                             # Task 10
 ├── README.md                          # Task 10
 ├── docs/
@@ -74,7 +74,7 @@ fpd/
 
 ---
 
-# PART A — M0 Risk Spikes
+# PART A, M0 Risk Spikes
 
 Spike code is throwaway. It is committed (so the findings are reproducible) but lives outside the workspace and is never refactored into production code. Each spike answers one question and stops.
 
@@ -86,25 +86,25 @@ Spike code is throwaway. It is committed (so the findings are reproducible) but 
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: a workspace that builds; `spikes/*` excluded from it.
+- Produces: a workspace that builds. `spikes/*` excluded from it.
 
 - [ ] **Step 1: Create the workspace manifest**
 
 `Cargo.toml`:
 
-Members use a glob so Task 1 does not have to declare crates that do not exist yet;
+Members use a glob so Task 1 does not have to declare crates that do not exist yet,
 Tasks 5 and 9 are picked up automatically as they land.
 
 Two things bite here and both were hit during execution:
 
-1. **A workspace glob matching nothing is a hard error** — `manifest is virtual, and the
+1. **A workspace glob matching nothing is a hard error**, `manifest is virtual, and the
    workspace has no members`. Task 1 therefore creates a bare `crates/fingerprint-terms`
    stub (manifest plus an empty `lib.rs`, and **no `build.rs`**, which would panic
    without `TERMS.md`). Task 5 fills it in via TDD.
 2. **`cargo new` inside the repo auto-appends the new crate to `workspace.members`**,
    and an explicit member overrides `exclude`. After creating any spike, delete the line
    it added. Spike manifests must also use literal values rather than
-   `edition.workspace = true` — excluded crates have no workspace root to inherit from.
+   `edition.workspace = true`, excluded crates have no workspace root to inherit from.
 
 ```toml
 [workspace]
@@ -170,7 +170,7 @@ Expected: builds with zero members compiled (no crates yet) and **no** mention o
 Run: `cargo build --manifest-path spikes/s1-recording-stream/Cargo.toml`
 Expected: compiles (empty main is fine at this point).
 
-- [ ] **Step 4: STOP — hand off to the owner for commit**
+- [ ] **Step 4: STOP, hand off to the owner for commit**
 
 `git init` may be run by the implementer (inert). Then stop and give the owner:
 
@@ -183,7 +183,7 @@ Wait for the owner before starting Task 2.
 
 ---
 
-### Task 2: Spike S1 — recover raw ClientHello under tokio-rustls
+### Task 2: Spike S1, recover raw ClientHello under tokio-rustls
 
 **Question:** Can a recording wrapper tee raw bytes under `tokio-rustls` while the handshake still completes, and is extension *order* recoverable from what it captured?
 
@@ -306,11 +306,11 @@ Expected in the listener: `handshake OK`, a non-zero byte count, and a non-empty
 - [ ] **Step 4: Drive it with real Chrome and confirm order varies**
 
 Open `https://127.0.0.1:8443/` in Chrome, accept the certificate warning, then reload three times.
-Expected: three `extension order` lines that contain the **same set** of IDs in **different sequences** — direct confirmation of the Chrome permutation behaviour that spec §6.9 builds the equivalence classes on.
+Expected: three `extension order` lines that contain the **same set** of IDs in **different sequences**, direct confirmation of the Chrome permutation behaviour that spec §6.9 builds the equivalence classes on.
 
-**S1 passes if** the handshake completes AND the extension list is non-empty. If the handshake fails, the fallback is a raw TCP pre-read of the first record before handing the socket to rustls — record that outcome and move on; do not spend more than half a day here.
+**S1 passes if** the handshake completes AND the extension list is non-empty. If the handshake fails, the fallback is a raw TCP pre-read of the first record before handing the socket to rustls, record that outcome and move on. Do not spend more than half a day here.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add spikes/s1-recording-stream/
@@ -321,7 +321,7 @@ Wait for the owner before starting Task 3.
 
 ---
 
-### Task 3: Spike S2 — replay a consumed h2 preface into hyper
+### Task 3: Spike S2, replay a consumed h2 preface into hyper
 
 **Question:** After manually consuming the HTTP/2 preface, SETTINGS, and HEADERS, can the same connection still be served normally?
 
@@ -329,7 +329,7 @@ Wait for the owner before starting Task 3.
 - Create: `spikes/s2-h2-replay/Cargo.toml`, `spikes/s2-h2-replay/src/main.rs`
 
 **Interfaces:**
-- Consumes: the `Recording` pattern from Task 2 (copy it; spikes do not share code).
+- Consumes: the `Recording` pattern from Task 2 (copy it. Spikes do not share code).
 - Produces: evidence that a `Replaying` adapter lets `hyper` serve a request whose opening bytes were already read.
 
 - [ ] **Step 1: Create the crate manifest**
@@ -355,7 +355,7 @@ http-body-util = "0.1"
 
 - [ ] **Step 2: Write the replaying adapter and the capture-then-serve flow**
 
-`spikes/s2-h2-replay/src/main.rs` — the load-bearing part is `Replaying`, which yields buffered bytes before falling through to the live socket:
+`spikes/s2-h2-replay/src/main.rs`, the load-bearing part is `Replaying`, which yields buffered bytes before falling through to the live socket:
 
 ```rust
 use std::pin::Pin;
@@ -403,7 +403,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for Replaying<S> {
 The `main` follows the S1 shape, with ALPN set to `h2`, and after the TLS handshake:
 
 1. `read_exact` the 24-byte preface `PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n` into `captured`.
-2. Loop reading 9-byte frame headers plus payloads, appending each to `captured`, printing `type` and — for SETTINGS — the `(id, value)` pairs in wire order, until a HEADERS frame (type `0x1`) is seen.
+2. Loop reading 9-byte frame headers plus payloads, appending each to `captured`, printing `type` and, for SETTINGS, the `(id, value)` pairs in wire order, until a HEADERS frame (type `0x1`) is seen.
 3. Wrap: `let stream = Replaying::new(captured, tls_stream);`
 4. Serve it: `hyper::server::conn::http2::Builder::new(TokioExecutor::new()).serve_connection(TokioIo::new(stream), service)` returning a 200 with body `ok`.
 
@@ -414,9 +414,9 @@ Then: `curl -k --http2 -v https://127.0.0.1:8443/`
 
 Expected: the listener prints the captured SETTINGS pairs (curl should show `3:100`, the tell described in spec §6.1), **and** curl receives `HTTP/2 200` with body `ok`.
 
-**S2 passes if** curl gets a 200 after the preface was consumed. If hyper rejects the replayed stream, the fallback is a frame-level proxy in `serve` instead of terminating with hyper — more work, still viable. Record the outcome either way.
+**S2 passes if** curl gets a 200 after the preface was consumed. If hyper rejects the replayed stream, the fallback is a frame-level proxy in `serve` instead of terminating with hyper, more work, still viable. Record the outcome either way.
 
-- [ ] **Step 4: STOP — hand off to the owner for commit**
+- [ ] **Step 4: STOP, hand off to the owner for commit**
 
 ```bash
 git add spikes/s2-h2-replay/
@@ -427,11 +427,11 @@ Wait for the owner before starting Task 4.
 
 ---
 
-### Task 4: Spike S3 — BoringSSL against a captured Chrome ClientHello, and the findings doc
+### Task 4: Spike S3, BoringSSL against a captured Chrome ClientHello, and the findings doc
 
 **Question:** Can `boring` emit a ClientHello whose cipher and extension sets match a real captured Chrome?
 
-This is the spike that decides whether emulation (M5) is in v1 or moves to v2. It compares **sorted** cipher and extension lists plus GREASE counts — not literal order, because Chrome permutes (confirmed in Task 2 Step 4) and not the JA4 hash, because a correct JA4 implementation is M2's job and throwaway code must not depend on it.
+This is the spike that decides whether emulation (M5) is in v1 or moves to v2. It compares **sorted** cipher and extension lists plus GREASE counts, not literal order, because Chrome permutes (confirmed in Task 2 Step 4) and not the JA4 hash, because a correct JA4 implementation is M2's job and throwaway code must not depend on it.
 
 **Files:**
 - Create: `spikes/s3-boring-ja4/Cargo.toml`, `spikes/s3-boring-ja4/src/main.rs`
@@ -443,23 +443,23 @@ This is the spike that decides whether emulation (M5) is in v1 or moves to v2. I
 
 - [ ] **Step 1: Capture a real Chrome baseline**
 
-Run the S1 listener, open `https://127.0.0.1:8443/` in Chrome, and save the printed extension list and byte dump to `docs/spikes/chrome-baseline.txt`. Extend the S1 `main` to also print the cipher list (it is at the offset the parser already walks past) and the count of GREASE values — those matching the pattern `0x?A?A` where both bytes are equal and the low nibble is `A`.
+Run the S1 listener, open `https://127.0.0.1:8443/` in Chrome, and save the printed extension list and byte dump to `docs/spikes/chrome-baseline.txt`. Extend the S1 `main` to also print the cipher list (it is at the offset the parser already walks past) and the count of GREASE values, those matching the pattern `0x?A?A` where both bytes are equal and the low nibble is `A`.
 
 - [ ] **Step 2: Write the boring client**
 
-`spikes/s3-boring-ja4/Cargo.toml` depends on `boring = "4"` and `tokio-boring = "4"`. `src/main.rs` builds an `SslConnector` with Chrome-shaped settings — cipher list, `set_grease_enabled(true)`, ALPN `h2,http/1.1`, TLS 1.2–1.3 — connects to `127.0.0.1:8443`, and lets the S1 listener print what arrived.
+`spikes/s3-boring-ja4/Cargo.toml` depends on `boring = "4"` and `tokio-boring = "4"`. `src/main.rs` builds an `SslConnector` with Chrome-shaped settings, cipher list, `set_grease_enabled(true)`, ALPN `h2,http/1.1`, TLS 1.2-1.3, connects to `127.0.0.1:8443`, and lets the S1 listener print what arrived.
 
 - [ ] **Step 3: Compare**
 
-Run the S1 listener; run the boring client against it; diff the sorted cipher list, the sorted extension list, and the GREASE count against `chrome-baseline.txt`.
+Run the S1 listener, run the boring client against it, diff the sorted cipher list, the sorted extension list, and the GREASE count against `chrome-baseline.txt`.
 
-**S3 passes if** all three match. Partial match is a partial pass — record exactly which fields differ, because that list becomes M5's work queue.
+**S3 passes if** all three match. Partial match is a partial pass, record exactly which fields differ, because that list becomes M5's work queue.
 
 - [ ] **Step 4: Write the findings document**
 
-`docs/spikes/2026-08-11-m0-findings.md` — one section per spike, each recording: the question, the command run, the literal output, PASS/FAIL, and the consequence for the plan. If S3 failed, state plainly that M5 moves to v2 and that M1–M4 + M6 still ship a complete inspection-only product (spec §11).
+`docs/spikes/2026-08-11-m0-findings.md`, one section per spike, each recording: the question, the command run, the literal output, PASS/FAIL, and the consequence for the plan. If S3 failed, state plainly that M5 moves to v2 and that M1-M4 + M6 still ship a complete inspection-only product (spec §11).
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add spikes/s3-boring-ja4/ docs/spikes/
@@ -470,7 +470,7 @@ Wait for the owner before starting Task 5.
 
 ---
 
-# PART B — M1 The Terms Gate
+# PART B, M1 The Terms Gate
 
 Everything from here is production code. It is built before any feature exists, so no commit in the history ever contains working functionality without the gate in front of it (spec §11).
 
@@ -486,7 +486,7 @@ Everything from here is production code. It is built before any feature exists, 
 - [ ] **Step 1: Write TERMS.md**
 
 ```markdown
-# fpd — Terms of Use
+# fpd, Terms of Use
 
 fpd (Flux Parsing Daemon) measures and reproduces the TLS and HTTP/2 identity of
 network clients. These terms govern how you may use it. The software licence is a
@@ -534,7 +534,7 @@ LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
 - [ ] **Step 2: Write the manifest and build script**
 
 Add dependencies with `cargo add`, not by hand. The root workspace manifest carries no
-`[workspace.dependencies]` table — with only two crates it buys little, and per-crate
+`[workspace.dependencies]` table, with only two crates it buys little, and per-crate
 `cargo add` writes correctly resolved versions instead of guessed ones. If a third crate
 arrives and versions start drifting, hoist then.
 
@@ -596,7 +596,7 @@ mod tests {
 - [ ] **Step 4: Run to verify it fails**
 
 Run: `cargo test -p fingerprint-terms`
-Expected: FAIL — `cannot find value TERMS in this scope`.
+Expected: FAIL, `cannot find value TERMS in this scope`.
 
 - [ ] **Step 5: Add the constants**
 
@@ -615,7 +615,7 @@ pub const TERMS_HASH: &str = env!("FPD_TERMS_HASH");
 Run: `cargo test -p fingerprint-terms`
 Expected: 2 passed. The second test is the CI check that `build.rs` and the source can never drift apart.
 
-- [ ] **Step 7: STOP — hand off to the owner for commit**
+- [ ] **Step 7: STOP, hand off to the owner for commit**
 
 ```bash
 git add TERMS.md crates/fingerprint-terms/
@@ -636,7 +636,7 @@ Wait for the owner before starting Task 6.
 - Consumes: `TERMS_HASH` from Task 5.
 - Produces: `AcceptanceRecord { terms_version, fpd_version, accepted_at, sig }`, `AcceptanceRecord::new(fpd_version: &str) -> Self`, `AcceptanceRecord::verify(&self) -> bool`.
 
-Pure logic only — no filesystem. That is what makes the forgery tests run without I/O.
+Pure logic only, no filesystem. That is what makes the forgery tests run without I/O.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -682,7 +682,7 @@ mod tests {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cargo test -p fingerprint-terms record`
-Expected: FAIL — `cannot find struct AcceptanceRecord`.
+Expected: FAIL, `cannot find struct AcceptanceRecord`.
 
 - [ ] **Step 3: Implement the record**
 
@@ -748,7 +748,7 @@ Add `pub mod record;` to `lib.rs`.
 Run: `cargo test -p fingerprint-terms record`
 Expected: 4 passed.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-terms/src/
@@ -769,7 +769,7 @@ Wait for the owner before starting Task 7.
 - Consumes: `AcceptanceRecord` from Task 6.
 - Produces: `config_dir() -> Result<PathBuf, TermsError>`, `load(&Path) -> Option<AcceptanceRecord>`, `save(&Path, &AcceptanceRecord) -> Result<(), TermsError>`, `history::append(&Path, &AcceptanceRecord, source: &str) -> Result<(), TermsError>`.
 
-`load` returns `Option`, not `Result` — a missing file, an unreadable file, and malformed JSON are all simply "not accepted". This is the design point that makes deletion lock a user out rather than let them through.
+`load` returns `Option`, not `Result`, a missing file, an unreadable file, and malformed JSON are all simply "not accepted". This is the design point that makes deletion lock a user out rather than let them through.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -824,7 +824,7 @@ mod tests {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cargo test -p fingerprint-terms store`
-Expected: FAIL — `cannot find function save`.
+Expected: FAIL, `cannot find function save`.
 
 - [ ] **Step 3: Implement the store**
 
@@ -861,7 +861,7 @@ pub fn save(dir: &Path, r: &AcceptanceRecord) -> Result<(), TermsError> {
     Ok(())
 }
 
-/// Any failure — missing, unreadable, malformed, or unverifiable — reads as
+/// Any failure, missing, unreadable, malformed, or unverifiable, reads as
 /// "not accepted". There is no path by which removing a file grants access.
 pub fn load(dir: &Path) -> Option<AcceptanceRecord> {
     let bytes = std::fs::read(record_path(dir)).ok()?;
@@ -932,7 +932,7 @@ Add `pub mod store; pub mod history;` to `lib.rs`.
 Run: `cargo test -p fingerprint-terms`
 Expected: all passed.
 
-- [ ] **Step 8: STOP — hand off to the owner for commit**
+- [ ] **Step 8: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-terms/src/
@@ -943,7 +943,7 @@ Wait for the owner before starting Task 8.
 
 ---
 
-### Task 8: The gate — argv carve-outs and the check
+### Task 8: The gate, argv carve-outs and the check
 
 **Files:**
 - Create: `crates/fingerprint-terms/src/gate.rs`
@@ -956,8 +956,8 @@ Wait for the owner before starting Task 8.
 **Deviation from the original plan, applied during execution.** `check` was split into a
 pure `check_with(dir, env_accepted)` plus a thin `check(dir)` that supplies
 `env_accepted()`. Reason: `FPD_ACCEPT_TERMS` is process-global, so a unit test setting it
-would race every other test in the binary — Rust runs tests in parallel threads. The
-pure function is unit-tested; the real environment variable is exercised in Task 9's
+would race every other test in the binary, Rust runs tests in parallel threads. The
+pure function is unit-tested. The real environment variable is exercised in Task 9's
 integration tests, where each invocation is its own process and cannot race.
 
 The gate reads raw `argv` rather than parsed clap output, so it runs before argument validation. A subcommand with a usage error still cannot execute anything.
@@ -1027,7 +1027,7 @@ mod tests {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `cargo test -p fingerprint-terms gate`
-Expected: FAIL — `cannot find function applies_to`.
+Expected: FAIL, `cannot find function applies_to`.
 
 - [ ] **Step 3: Implement the gate**
 
@@ -1062,7 +1062,7 @@ impl GateRefusal {
     }
 }
 
-/// `FPD_ACCEPT_TERMS=1` is an acceptance mechanism for CI, not an exemption —
+/// `FPD_ACCEPT_TERMS=1` is an acceptance mechanism for CI, not an exemption,
 /// callers record it to history exactly as an interactive acceptance.
 pub fn check(dir: &Path) -> Result<(), GateRefusal> {
     if std::env::var("FPD_ACCEPT_TERMS").as_deref() == Ok("1") {
@@ -1079,7 +1079,7 @@ Add `pub mod gate;` to `lib.rs`.
 Run: `cargo test -p fingerprint-terms`
 Expected: all passed.
 
-- [ ] **Step 5: STOP — hand off to the owner for commit**
+- [ ] **Step 5: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fingerprint-terms/src/
@@ -1090,7 +1090,7 @@ Wait for the owner before starting Task 9.
 
 ---
 
-### Task 9: The `fpd` binary — gate before clap, and `fpd terms`
+### Task 9: The `fpd` binary, gate before clap, and `fpd terms`
 
 **Files:**
 - Create: `crates/fpd/Cargo.toml`, `crates/fpd/src/main.rs`, `crates/fpd/src/cli.rs`, `crates/fpd/src/commands/mod.rs`, `crates/fpd/src/commands/terms.rs`
@@ -1098,7 +1098,7 @@ Wait for the owner before starting Task 9.
 
 **Interfaces:**
 - Consumes: `fingerprint_terms::{gate, store, history, record, TERMS, TERMS_HASH}`.
-- Produces: the `fpd` binary. Every later milestone adds subcommands to `cli.rs`; none of them add gate code, because Task 8's check is applied once in `main`.
+- Produces: the `fpd` binary. Every later milestone adds subcommands to `cli.rs`. None of them add gate code, because Task 8's check is applied once in `main`.
 
 - [ ] **Step 1: Write the manifest**
 
@@ -1110,7 +1110,7 @@ name = "flux-parsing-daemon"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "fpd — TLS/HTTP-2 fingerprint inspection and verified emulation"
+description = "fpd, TLS/HTTP-2 fingerprint inspection and verified emulation"
 
 [[bin]]
 name = "fpd"
@@ -1243,7 +1243,7 @@ Add `fingerprint-terms = { path = "../fingerprint-terms" }` to `[dev-dependencie
 - [ ] **Step 3: Run to verify they fail**
 
 Run: `cargo test -p flux-parsing-daemon`
-Expected: FAIL — no binary target compiles yet.
+Expected: FAIL, no binary target compiles yet.
 
 - [ ] **Step 4: Write the CLI definitions**
 
@@ -1253,7 +1253,7 @@ Expected: FAIL — no binary target compiles yet.
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "fpd", version, about = "Flux Parsing Daemon — TLS/HTTP-2 fingerprint inspection and verified emulation")]
+#[command(name = "fpd", version, about = "Flux Parsing Daemon, TLS/HTTP-2 fingerprint inspection and verified emulation")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -1291,7 +1291,7 @@ pub enum TermsAction {
 }
 ```
 
-Subcommands other than `Terms` are declared now and print `not yet implemented (see milestone)` — they exist so the gate tests enumerate real commands from day one.
+Subcommands other than `Terms` are declared now and print `not yet implemented (see milestone)`, they exist so the gate tests enumerate real commands from day one.
 
 - [ ] **Step 5: Write the terms command**
 
@@ -1389,7 +1389,7 @@ Run: `FPD_CONFIG_DIR=/tmp/fpd-manual cargo run -p flux-parsing-daemon --bin fpd 
 Then re-run the `serve` command.
 Expected: `serve: not yet implemented (M4)`.
 
-- [ ] **Step 9: STOP — hand off to the owner for commit**
+- [ ] **Step 9: STOP, hand off to the owner for commit**
 
 ```bash
 git add crates/fpd/
@@ -1402,7 +1402,7 @@ Wait for the owner before starting Task 10.
 
 ### Task 10: Licence, NOTICE, README, and CI
 
-**Blocked on one decision:** which licence. Everything else in this task is independent of that choice — only the content of `LICENSE` and one paragraph of `NOTICE` change. Do the rest first if the decision is outstanding.
+**Blocked on one decision:** which licence. Everything else in this task is independent of that choice, only the content of `LICENSE` and one paragraph of `NOTICE` change. Do the rest first if the decision is outstanding.
 
 **Files:**
 - Create: `LICENSE`, `NOTICE`, `README.md`, `.github/workflows/ci.yml`
@@ -1414,7 +1414,7 @@ Wait for the owner before starting Task 10.
 - [ ] **Step 1: Write NOTICE**
 
 ```
-fpd — Flux Parsing Daemon
+fpd, Flux Parsing Daemon
 Copyright (c) 2026 Arsyad Maulana
 
 This software measures and reproduces the TLS and HTTP/2 identity of network
@@ -1427,11 +1427,11 @@ displayed by `fpd terms show`.
 This notice must be retained in all copies and derivative works.
 ```
 
-- [ ] **Step 2: Write LICENSE — OUTSTANDING, owner action required**
+- [ ] **Step 2: Write LICENSE, OUTSTANDING, owner action required**
 
 **Not written during execution, deliberately.** Licence text is legally operative and
 must be byte-for-byte canonical. Reconstructing it from memory, or retrieving it through
-a summarising fetch that may paraphrase, risks shipping a subtly altered licence — worse
+a summarising fetch that may paraphrase, risks shipping a subtly altered licence, worse
 than shipping none, because a plausible-looking wrong `LICENSE` will not be questioned.
 
 The owner supplies it directly:
@@ -1442,7 +1442,7 @@ curl -fsSL https://raw.githubusercontent.com/elastic/elasticsearch/main/licenses
 ```
 
 Verify the retrieved text against https://www.elastic.co/licensing/elastic-license
-before committing; if the raw path has moved, copy from the canonical page instead.
+before committing. If the raw path has moved, copy from the canonical page instead.
 
 Then record it in both manifests so the licence travels with any publish:
 
@@ -1455,7 +1455,7 @@ Everything else in Task 10 is licence-independent and was completed.
 
 - [ ] **Step 3: Write README.md**
 
-Above the fold, in this order: the one-line description; the current `TERMS_HASH` labelled as the canonical value to verify a binary against; the licence position (source-available, readable and cloneable, redistribution and notice-removal forbidden); a link to `TERMS.md`; then build and run instructions. Include the §4.3 honest statement — that a determined user can rebuild without the gate, that this cannot be prevented, and that doing so is a deliberate, detectable licence breach.
+Above the fold, in this order: the one-line description, the current `TERMS_HASH` labelled as the canonical value to verify a binary against, the licence position (source-available, readable and cloneable, redistribution and notice-removal forbidden), a link to `TERMS.md`, then build and run instructions. Include the §4.3 honest statement, that a determined user can rebuild without the gate, that this cannot be prevented, and that doing so is a deliberate, detectable licence breach.
 
 - [ ] **Step 4: Write the CI workflow**
 
@@ -1466,7 +1466,7 @@ Above the fold, in this order: the one-line description; the current `TERMS_HASH
 Run: `cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
 Expected: clean.
 
-- [ ] **Step 6: STOP — hand off to the owner for commit**
+- [ ] **Step 6: STOP, hand off to the owner for commit**
 
 ```bash
 git add LICENSE NOTICE README.md .github/
@@ -1479,10 +1479,10 @@ This is the final task in the plan.
 
 ## Self-Review
 
-**Spec coverage for M0 + M1.** §11 M0 S1 → Task 2. S2 → Task 3. S3 → Task 4. §4.1.1 layer 1 (`include_str!`, nothing read from disk) → Task 5 + Task 9 immutability tests. Layer 2 (build.rs hash, published canonical value) → Task 5 Step 2, Task 10 Step 3. Layer 3 (notice retention) → Task 10 Steps 1–2. §4.2 gate in `main()` before dispatch → Task 9 Step 6. Carve-outs → Task 8. HMAC record, forgery rejected → Task 6. Deletion locks out → Task 7. Append-only history → Task 7. `FPD_ACCEPT_TERMS` recorded not exempt → Task 8 + Task 9. §9.6 gate tests → Task 9. §9.7 immutability tests → Task 9.
+**Spec coverage for M0 + M1.** §11 M0 S1 maps to Task 2. S2 maps to Task 3. S3 maps to Task 4. §4.1.1 layer 1 (`include_str!`, nothing read from disk) maps to Task 5 + Task 9 immutability tests. Layer 2 (build.rs hash, published canonical value) maps to Task 5 Step 2, Task 10 Step 3. Layer 3 (notice retention) maps to Task 10 Steps 1-2. §4.2 gate in `main()` before dispatch maps to Task 9 Step 6. Carve-outs maps to Task 8. HMAC record, forgery rejected maps to Task 6. Deletion locks out maps to Task 7. Append-only history maps to Task 7. `FPD_ACCEPT_TERMS` recorded not exempt maps to Task 8 + Task 9. §9.6 gate tests maps to Task 9. §9.7 immutability tests maps to Task 9.
 
-**Not in this plan, by design:** M2–M6. Each gets its own plan. The next one is M2 (`fingerprint-core` TLS parsing, JA3/JA4, fixture harness), which should be written after the M0 findings land, because a failed S3 changes whether M5 stays in v1.
+**Not in this plan, by design:** M2-M6. Each gets its own plan. The next one is M2 (`fingerprint-core` TLS parsing, JA3/JA4, fixture harness), which should be written after the M0 findings land, because a failed S3 changes whether M5 stays in v1.
 
 **Known gap, deliberate:** Task 9's `GATED` list in `tests/gate.rs` is written by hand rather than derived from clap introspection. Deriving it would require exposing `Cli` from a library target. When M2 adds the first real subcommand, convert `crates/fpd/src/cli.rs` into a `lib.rs` target and replace the constant with an enumeration over `Cli::command().get_subcommands()`. Until then, the hand-written list covers every declared subcommand and the plan records the debt rather than hiding it.
 
-**Type consistency check:** `AcceptanceRecord::new(&str)` (Task 6) is called with `env!("CARGO_PKG_VERSION")` in Task 9 — matches. `store::load(&Path) -> Option<AcceptanceRecord>` (Task 7) is consumed by `gate::check` (Task 8) via `.map(|_| ()).ok_or(...)` — matches. `history::append(&Path, &AcceptanceRecord, &str)` (Task 7) is called with `"interactive"` in Task 9 — matches. `gate::applies_to(&[String])` (Task 8) is called with `Vec<String>` in Task 9 — matches via deref.
+**Type consistency check:** `AcceptanceRecord::new(&str)` (Task 6) is called with `env!("CARGO_PKG_VERSION")` in Task 9, matches. `store::load(&Path) -> Option<AcceptanceRecord>` (Task 7) is consumed by `gate::check` (Task 8) via `.map(|_| ()).ok_or(...)`, matches. `history::append(&Path, &AcceptanceRecord, &str)` (Task 7) is called with `"interactive"` in Task 9, matches. `gate::applies_to(&[String])` (Task 8) is called with `Vec<String>` in Task 9, matches via deref.

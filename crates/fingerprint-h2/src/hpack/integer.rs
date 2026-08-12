@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn high_bits_outside_the_prefix_are_ignored() {
-        // 0xea = 111_01010; with a 5-bit prefix only 01010 = 10 is the value.
+        // 0xea = 111_01010. With a 5-bit prefix only 01010 = 10 is the value.
         assert_eq!(decode(&[0xea], 5).expect("decode"), (10, 1));
     }
 

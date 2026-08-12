@@ -27,7 +27,7 @@ pub(crate) fn sha256_hex(s: &str) -> String {
     format!("{:x}", Sha256::digest(s.as_bytes()))
 }
 
-/// Two-digit decimal, capped at 99 — the spec's "if there's > 99, output 99".
+/// Two-digit decimal, capped at 99, the spec's "if there's > 99, output 99".
 pub(crate) fn count2(n: usize) -> String {
     format!("{:02}", n.min(99))
 }
@@ -51,11 +51,11 @@ fn is_alnum(b: u8) -> bool {
     b.is_ascii_digit() || b.is_ascii_uppercase() || b.is_ascii_lowercase()
 }
 
-/// First and last characters of the first ALPN value; `00` when absent or empty.
+/// First and last characters of the first ALPN value. `00` when absent or empty.
 ///
-/// NOTE: the non-alphanumeric branch below is **not exercised by any fixture** —
+/// NOTE: the non-alphanumeric branch below is **not exercised by any fixture**,
 /// every capture so far negotiates `h2`. The spec calls for a hex representation
-/// there; this implementation is a reasonable reading of it but should be checked
+/// there. This implementation is a reasonable reading of it but should be checked
 /// against a reference implementation before it is relied on. Recorded as a known
 /// gap in the M2 plan.
 pub(crate) fn alpn_chars(alpn: Option<&str>) -> String {
@@ -96,8 +96,8 @@ pub fn ja4_b(ciphers: &[u16]) -> String {
     sha256_hex(&s).get(..12).unwrap_or(EMPTY_HASH).to_string()
 }
 
-/// Extensions sorted ascending with SNI (0000) and ALPN (0010) removed — segment
-/// (a) already carries both — then `_`, then signature algorithms in wire order.
+/// Extensions sorted ascending with SNI (0000) and ALPN (0010) removed, segment
+/// (a) already carries both, then `_`, then signature algorithms in wire order.
 pub(crate) fn ja4_c_string(extensions: &[u16], sig_algs: &[u16]) -> String {
     let mut e: Vec<u16> = strip(extensions)
         .into_iter()
@@ -255,7 +255,7 @@ mod tests {
 
     /// M0 finding 1: Chrome permutes extension order on every connection. JA4
     /// sorts before hashing, so it must survive that. This is the single most
-    /// important assertion in M2 — it is the reason JA4 replaced JA3.
+    /// important assertion in M2, it is the reason JA4 replaced JA3.
     #[test]
     fn ja4_is_stable_across_extension_permutation() {
         let raw = fixture("chrome-macos");

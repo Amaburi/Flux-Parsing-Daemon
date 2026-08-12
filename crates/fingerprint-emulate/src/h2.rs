@@ -66,7 +66,7 @@ fn pseudo_headers(order: &str, authority: &str, scheme: &str, path: &str) -> Vec
 /// position is that fpd records names, order and counts and nothing else. So a
 /// profile carries the *shape* of a request and the caller supplies what goes in
 /// it, which is the correct division. A caller wanting to look like Chrome to a
-/// real server must provide real values; empty ones reproduce the fingerprint but
+/// real server must provide real values. Empty ones reproduce the fingerprint but
 /// would not survive anything that inspects content.
 pub fn preamble_for(profile: &Profile, authority: &str) -> Result<Vec<u8>, EmulateError> {
     preamble_with_values(profile, authority, &[])

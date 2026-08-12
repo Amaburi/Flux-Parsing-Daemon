@@ -1,4 +1,4 @@
-//! `fpd capture` — record a browser profile from live handshakes.
+//! `fpd capture`, record a browser profile from live handshakes.
 
 use std::time::Duration;
 

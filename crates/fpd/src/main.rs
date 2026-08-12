@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used)]
+
 mod cli;
 mod commands;
 
@@ -7,7 +9,7 @@ use std::process::ExitCode;
 fn main() -> ExitCode {
     // The gate runs on raw argv, BEFORE clap. A subcommand invoked with bad flags
     // is refused here rather than reaching clap's validator, so no code path at all
-    // executes before acceptance. This is the only gate call site in the codebase;
+    // executes before acceptance. This is the only gate call site in the codebase,
     // subcommands added later inherit it without touching gate logic.
     let argv: Vec<String> = std::env::args().skip(1).collect();
 
@@ -28,7 +30,7 @@ fn main() -> ExitCode {
 
         // FPD_ACCEPT_TERMS is an acceptance mechanism, not an exemption: when it is
         // what granted access, it leaves the same audit trail an interactive
-        // acceptance would. Best-effort — an unwritable config dir must not stop a
+        // acceptance would. Best-effort, an unwritable config dir must not stop a
         // run that was already authorised.
         if env_accepted && fingerprint_terms::store::load(&dir).is_none() {
             let rec = fingerprint_terms::record::AcceptanceRecord::new(env!("CARGO_PKG_VERSION"));
@@ -95,7 +97,7 @@ fn main() -> ExitCode {
         }
         None => {
             // Unreachable in practice: bare argv is gated above.
-            eprintln!("fpd: no command given; try `fpd --help`");
+            eprintln!("fpd: no command given. try `fpd --help`");
             return ExitCode::FAILURE;
         }
     }

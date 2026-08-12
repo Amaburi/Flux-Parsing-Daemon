@@ -1,4 +1,4 @@
-//! `fpd emulate` — build a client that reproduces a profile, and prove it does.
+//! `fpd emulate`, build a client that reproduces a profile, and prove it does.
 
 #[cfg(feature = "emulation")]
 use fingerprint_probe::profile::ProfileDb;

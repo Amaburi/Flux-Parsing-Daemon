@@ -147,7 +147,7 @@ pub enum ProfileError {
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("unknown profile `{0}`; available: {1}")]
+    #[error("unknown profile `{0}`. available: {1}")]
     Unknown(String, String),
 }
 
