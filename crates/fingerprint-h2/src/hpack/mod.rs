@@ -14,6 +14,7 @@
 //! entries it added earlier in the same block.
 
 pub mod decoder;
+pub mod encode;
 pub mod huffman;
 pub mod integer;
 pub mod table;
