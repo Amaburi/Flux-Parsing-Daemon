@@ -1,0 +1,27 @@
+[package]
+name = "fingerprint-emulate"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+boring = { version = "5", optional = true }
+boring-sys = { version = "5", optional = true }
+fingerprint-core = { version = "0.1.0", path = "../fingerprint-core" }
+fingerprint-probe = { version = "0.1.0", path = "../fingerprint-probe" }
+foreign-types = { version = "0.5", optional = true }
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["net", "io-util", "rt", "time"] }
+tokio-boring = { version = "5", optional = true }
+
+[features]
+# Off by default, per design section 4.2. Enabling emulation is an explicit
+# opt-in in the consumer's Cargo.toml, and it pulls in BoringSSL, a C dependency
+# that a default build does not carry.
+default = []
+emulation = ["dep:boring", "dep:tokio-boring", "dep:boring-sys", "dep:foreign-types"]
+
+[dev-dependencies]
+fingerprint-probe = { path = "../fingerprint-probe" }
+tokio = { version = "1.53.1", features = ["full"] }
