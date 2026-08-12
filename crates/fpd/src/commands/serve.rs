@@ -10,6 +10,7 @@ pub struct Args {
     pub upstream: String,
     pub ip_mode: String,
     pub cacert_out: Option<String>,
+    pub admin_socket: Option<String>,
 }
 
 pub fn run(args: Args) -> u8 {
@@ -71,6 +72,16 @@ pub fn run(args: Args) -> u8 {
     rt.block_on(async move {
         let mut cfg = ServeConfig::new(listen, upstream);
         cfg.ip_mode = ip_mode;
+
+        if let Some(path) = &args.admin_socket {
+            if cfg!(unix) {
+                cfg.admin_socket = Some(std::path::PathBuf::from(path));
+            } else {
+                // Reported rather than ignored, so a script that passes the flag
+                // on an unsupported platform does not silently get no socket.
+                eprintln!("fpd: --admin-socket is Unix only, ignoring `{path}`");
+            }
+        }
 
         let server = match Server::bind(cfg, db).await {
             Ok(s) => s,

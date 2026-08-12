@@ -53,12 +53,14 @@ fn main() -> ExitCode {
             upstream,
             ip_mode,
             cacert_out,
+            admin_socket,
         }) => {
             let code = commands::serve::run(commands::serve::Args {
                 listen,
                 upstream,
                 ip_mode,
                 cacert_out,
+                admin_socket,
             });
             return ExitCode::from(code);
         }

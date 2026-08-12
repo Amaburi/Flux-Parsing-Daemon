@@ -38,6 +38,10 @@ pub enum Command {
         /// Write the TLS certificate here
         #[arg(long)]
         cacert_out: Option<String>,
+        /// Expose a read-only admin socket here, for `fpd tui` and `nc -U`.
+        /// Unix only. Created mode 0600.
+        #[arg(long)]
+        admin_socket: Option<String>,
     },
     /// Live fingerprint dashboard  (M6)
     Tui,

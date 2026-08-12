@@ -289,3 +289,91 @@ async fn an_unreachable_upstream_yields_502() {
     let code = String::from_utf8_lossy(&out.stdout);
     assert_eq!(code.trim(), "502", "expected 502, got {code}");
 }
+
+// --- admin socket, end to end -----------------------------------------------
+
+#[cfg(unix)]
+async fn next_frame(
+    lines: &mut tokio::io::Lines<tokio::io::BufReader<tokio::net::UnixStream>>,
+) -> serde_json::Value {
+    let line = tokio::time::timeout(Duration::from_secs(8), lines.next_line())
+        .await
+        .expect("a frame within 8s")
+        .expect("read")
+        .expect("a line, not EOF");
+    serde_json::from_str(&line).unwrap_or_else(|e| panic!("bad json {line:?}: {e}"))
+}
+
+/// M6a's exit criterion. Real curl through a real `serve` must appear on the
+/// admin socket carrying the committed JA4 oracle, which exercises the whole
+/// chain from wire bytes to socket frame.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_real_connection_appears_on_the_admin_socket() {
+    use tokio::io::AsyncBufReadExt;
+    if !curl_available() {
+        eprintln!("curl not available, skipping");
+        return;
+    }
+
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let sock = dir.path().join("fpd.sock");
+    let seen = Seen::default();
+    let upstream = stub_upstream(seen.clone()).await;
+
+    let mut cfg = ServeConfig::new("127.0.0.1:0".parse().expect("addr"), upstream);
+    cfg.admin_socket = Some(sock.clone());
+    let server = Server::bind(cfg, ProfileDb::shipped().expect("db"))
+        .await
+        .expect("serve bind");
+    let url = format!("https://127.0.0.1:{}/", server.local_addr().port());
+    tokio::spawn(server.run());
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let stream = tokio::net::UnixStream::connect(&sock)
+        .await
+        .expect("connect to the admin socket");
+    let mut lines = tokio::io::BufReader::new(stream).lines();
+
+    // Nothing has connected yet, so the snapshot is empty.
+    assert_eq!(next_frame(&mut lines).await["type"], "snapshot_end");
+
+    let mut cmd = std::process::Command::new("curl");
+    cmd.args(["-sk", "--http2", "-o", "/dev/null", "--max-time", "8"])
+        .arg(&url);
+    let _ = cmd.output();
+
+    let v = next_frame(&mut lines).await;
+    assert_eq!(v["type"], "record");
+    assert_eq!(v["ja4"], "t13i4906h2_0d8feac7bc37_7395dae3b2f3");
+    assert_eq!(v["verdict"], "curl-8.7.1-macos");
+    assert_eq!(v["mismatch"], false);
+    assert!(
+        !v["raw_hello"].as_str().unwrap_or_default().is_empty(),
+        "the frame must carry the bytes"
+    );
+}
+
+/// Without the flag there must be no socket at all. An observability endpoint
+/// that appears by default is an exposure nobody asked for.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_admin_socket_exists_unless_the_flag_is_given() {
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let sock = dir.path().join("fpd.sock");
+    let upstream = stub_upstream(Seen::default()).await;
+
+    let cfg = ServeConfig::new("127.0.0.1:0".parse().expect("addr"), upstream);
+    assert!(cfg.admin_socket.is_none(), "default must be off");
+
+    let server = Server::bind(cfg, ProfileDb::shipped().expect("db"))
+        .await
+        .expect("serve bind");
+    tokio::spawn(server.run());
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    assert!(
+        !sock.exists(),
+        "a socket was created without --admin-socket"
+    );
+}

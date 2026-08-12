@@ -39,6 +39,11 @@ pub struct ServeConfig {
     pub upstream_timeout: Duration,
     /// How an IP is recorded in logs.
     pub ip_mode: IpMode,
+    /// Where to expose the read-only admin socket. `None` means no socket is
+    /// created at all, so an observability endpoint never appears unasked.
+    pub admin_socket: Option<std::path::PathBuf>,
+    /// How many recent connections stay in memory for a viewer to attach to.
+    pub log_capacity: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +64,8 @@ impl ServeConfig {
             capture_timeout: Duration::from_secs(10),
             upstream_timeout: Duration::from_secs(30),
             ip_mode: IpMode::Truncated,
+            admin_socket: None,
+            log_capacity: 1000,
         }
     }
 }
@@ -205,6 +212,7 @@ fn build_report(raw: &[u8], preamble: &[u8], alpn: Option<String>) -> Option<Cli
 
 pub struct Server {
     cfg: ServeConfig,
+    publisher: Arc<crate::admin::Publisher>,
     acceptor: TlsAcceptor,
     listener: TcpListener,
     db: Arc<ProfileDb>,
@@ -233,6 +241,7 @@ impl Server {
         let local = listener.local_addr()?;
 
         Ok(Self {
+            publisher: crate::admin::Publisher::new(cfg.log_capacity),
             cfg,
             acceptor: TlsAcceptor::from(Arc::new(tls)),
             listener,
@@ -252,6 +261,19 @@ impl Server {
 
     /// Serves until the task is dropped.
     pub async fn run(self) {
+        // Records accumulate whether or not anyone is watching, so a viewer that
+        // attaches later still sees recent history. Only the socket is optional.
+        #[cfg(unix)]
+        if let Some(path) = self.cfg.admin_socket.clone() {
+            match crate::admin::AdminSocket::bind(&path, Arc::clone(&self.publisher)) {
+                Ok(sock) => {
+                    tracing::info!(path = %path.display(), "admin socket");
+                    tokio::spawn(sock.serve());
+                }
+                Err(e) => tracing::warn!(path = %path.display(), error = %e, "admin socket"),
+            }
+        }
+
         loop {
             let Ok((tcp, peer)) = self.listener.accept().await else {
                 continue;
@@ -259,9 +281,10 @@ impl Server {
             let acceptor = self.acceptor.clone();
             let cfg = self.cfg.clone();
             let db = Arc::clone(&self.db);
+            let publisher = Arc::clone(&self.publisher);
 
             tokio::spawn(async move {
-                handle(tcp, peer, acceptor, cfg, db).await;
+                handle(tcp, peer, acceptor, cfg, db, publisher).await;
             });
         }
     }
@@ -273,6 +296,7 @@ async fn handle(
     acceptor: TlsAcceptor,
     cfg: ServeConfig,
     db: Arc<ProfileDb>,
+    publisher: Arc<crate::admin::Publisher>,
 ) {
     let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
     let recorded = RecordingStream::new(tcp, Arc::clone(&seen));
@@ -305,6 +329,11 @@ async fn handle(
         Some(r) => {
             let id = identify(r, &db);
             log_connection(&peer, r, &id, &cfg);
+            publisher.push(crate::log::ConnectionRecord::new(
+                r,
+                &id,
+                render_ip(&peer, cfg.ip_mode),
+            ));
             fp_headers(r, &id)
         }
         None => {

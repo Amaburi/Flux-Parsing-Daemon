@@ -242,6 +242,51 @@ Logging is one line per connection, at WARN when a claim mismatch is detected an
 otherwise, so the level is the thing to alert on. Client IPs are truncated by default,
 and `--ip-mode` takes `full`, `truncated` or `omitted`.
 
+### Watching a running instance
+
+`serve` keeps the last 1000 connections in memory and can expose them on a read-only
+Unix socket:
+
+```console
+$ fpd serve --listen 127.0.0.1:8443 --upstream 127.0.0.1:8080 \
+            --admin-socket /run/fpd.sock
+```
+
+Newline-delimited JSON, one object per connection, server to client only. A viewer
+receives the buffered history, then a `snapshot_end` marker, then everything that
+arrives afterwards. That format was chosen so it can be read without a client:
+
+```console
+$ nc -U /run/fpd.sock
+{"type":"record","seq":0,"at_ms":1786614271000,"ip":"45.9.148.0",
+ "ja4":"t13i4906h2_0d8feac7bc37_7395dae3b2f3","verdict":"curl-8.7.1-macos",
+ "score":1.0,"mismatch":false,"alpn":"h2","raw_hello":"FgMBAgAB...",
+ "provenance":{"ciphers":{"start":76,"len":98},...}}
+{"type":"snapshot_end","seq":0}
+```
+
+Each frame carries the ClientHello bytes and the byte ranges each fingerprinted field
+came from, so a viewer can show which bytes produced a fingerprint without asking the
+server again.
+
+Four things worth knowing before relying on it:
+
+- **The socket is created mode 0600.** It carries client addresses and fingerprints, so
+  it is restricted to the user running `fpd`. There is a test asserting the mode.
+- **No socket exists unless you pass the flag.** An observability endpoint that appears
+  by default is an exposure nobody asked for.
+- **Nothing is persisted.** The buffer is in memory, bounded, and gone when the process
+  ends. `fpd` never writes traffic to disk.
+- **A viewer that stops reading is dropped, not queued.** Records are discarded for that
+  client rather than blocking the proxy, and the gap is visible as a jump in `seq`. A
+  monitoring socket must never be able to stall the traffic it monitors.
+
+The JSON shape is **not a stable interface** yet. It exists to be inspected and to feed
+`fpd tui`, and it may change without notice until that lands.
+
+Unix only. On other platforms the flag is accepted and reported as unsupported rather
+than silently doing nothing.
+
 ### Rust applications need no proxy at all
 
 `serve` costs a process, a localhost hop, and something extra to deploy and keep alive.
