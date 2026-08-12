@@ -23,6 +23,7 @@ In development. What works today:
 | `fpd capture` | Working. Infers field ordering from repeat samples. |
 | Claim mismatch | **Working.** Flags a client whose User-Agent contradicts its fingerprint. |
 | `fpd serve` | **Working.** Reverse proxy that annotates traffic for any upstream. |
+| `fingerprint-tower` | **Working.** Embedded in a Rust app, no proxy and no extra hop. |
 | `tui` `emulate` | Not implemented. Stubs. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
@@ -190,6 +191,54 @@ Logging is one line per connection, at WARN when a claim mismatch is detected an
 otherwise, so the level is the thing to alert on. Client IPs are truncated by default,
 and `--ip-mode` takes `full`, `truncated` or `omitted`.
 
+### Rust applications need no proxy at all
+
+`serve` costs a process, a localhost hop, and something extra to deploy and keep alive.
+A Rust application needs none of that. One line changes, at the TLS accept point:
+
+```rust
+// before
+let acceptor = TlsAcceptor::from(config);
+// after
+let acceptor = fingerprint_tower::Acceptor::new(config);
+```
+
+Then per connection, add one layer to the router you already have:
+
+```rust
+let accepted = acceptor.accept(tcp).await?;
+let app = Router::new()
+    .route("/", get(handler))
+    .layer(FingerprintLayer::new(accepted.fingerprint));
+```
+
+And every handler knows what its caller is:
+
+```rust
+async fn handler(Extension(fp): Extension<ClientFingerprint>) -> String {
+    if fp.mismatch() {
+        // User-Agent says one thing, the TLS handshake says another.
+    }
+    fp.ja4.clone()
+}
+```
+
+This cannot be written as ordinary HTTP middleware. By the time a request reaches axum,
+rustls has finished the handshake and dropped the ClientHello, taking extension order and
+GREASE placement with it. The hook has to sit below HTTP, which is why it replaces the
+acceptor rather than adding a layer to the router alone.
+
+Two things to know before choosing this over `serve`:
+
+- **The fingerprint is per connection, not per request.** HTTP/2 multiplexes, so every
+  request on one connection shares one fingerprint. That is correct, because a
+  fingerprint describes the client rather than the request, but it surprises people.
+- **You still own the accept loop**, so connection limits and timeouts stay your
+  responsibility. `serve` bounds those itself. This does not, because it does not own
+  the listener.
+
+And the obvious one: this is Rust only. Anything else uses `serve`.
+
 ## The HTTP layer is fpd's own, not JA4H
 
 fpd compares HTTP headers as a list of named fields rather than as a hash. There is a
@@ -314,6 +363,7 @@ crates/fingerprint-terms/   embedded terms, signed acceptance record, the gate
 crates/fingerprint-core/    ClientHello parsing, JA3, JA4
 crates/fingerprint-h2/      HTTP/2 frame walk, HPACK, Akamai fingerprint
 crates/fingerprint-probe/   capture probe, profile database, diff engine
+crates/fingerprint-tower/   embedded acceptor and tower layer for Rust apps
 crates/fpd/                 the fpd binary (package: flux-parsing-daemon)
 scripts/bin2pcap.py         wraps a byte fixture in a pcap for tshark
 spikes/                     throwaway risk spikes, excluded from the workspace
