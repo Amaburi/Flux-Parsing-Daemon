@@ -68,7 +68,29 @@ fn reported_hash_matches_the_embedded_text() {
         .stdout(predicate::str::contains(fingerprint_terms::TERMS_HASH));
 }
 
-/// A decoy on disk must not shift the reported hash either — otherwise the
+/// The README publishes the canonical hash, and spec §4.1.1 layer 2 rests on it:
+/// a binary reporting anything else is not a genuine build. If an edit to
+/// `TERMS.md` does not reach the README, every honest build starts failing that
+/// check, so the two are pinned together here rather than by remembering.
+#[test]
+fn the_hash_published_in_the_readme_is_the_current_one() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../README.md");
+    let readme = std::fs::read_to_string(&path).expect("README.md at the repo root");
+
+    let published = readme
+        .lines()
+        .map(str::trim)
+        .find(|l| l.starts_with("sha256:") && l.len() == 71)
+        .expect("README must publish the canonical terms hash");
+
+    assert_eq!(
+        published,
+        fingerprint_terms::TERMS_HASH,
+        "README publishes a stale terms hash. TERMS.md changed without it"
+    );
+}
+
+/// A decoy on disk must not shift the reported hash either, otherwise the
 /// verification story in spec §4.1.1 layer 2 would be defeated by a local file.
 #[test]
 fn reported_hash_is_unaffected_by_an_on_disk_terms_md() {
