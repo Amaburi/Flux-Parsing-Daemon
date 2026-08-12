@@ -3,10 +3,24 @@
 
 use crate::ext;
 use crate::grease::strip;
-use crate::hello::{parse_hello, RawHello};
+use crate::hello::{parse_hello, RawHello, Span};
 use crate::reader::ParseError;
 
 const EMPTY_HASH: &str = "000000000000";
+
+/// Where in the ClientHello each fingerprinted field came from.
+///
+/// Offsets are absolute within the buffer passed to `fingerprint`. `ClientReport`
+/// retains that buffer, so a consumer can slice with these directly.
+///
+/// `per_extension` is in wire order and parallel to `TlsFingerprint::extensions`,
+/// GREASE included, so an index into either applies to the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Provenance {
+    pub ciphers: Span,
+    pub extensions: Span,
+    pub per_extension: Vec<(u16, Span)>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TlsFingerprint {
@@ -20,6 +34,7 @@ pub struct TlsFingerprint {
     pub grease_ext_positions: Vec<usize>,
     pub alpn: Option<String>,
     pub has_sni: bool,
+    pub provenance: Provenance,
 }
 
 pub(crate) fn sha256_hex(s: &str) -> String {
@@ -155,6 +170,13 @@ pub fn fingerprint(raw: &[u8]) -> Result<TlsFingerprint, ParseError> {
     let ext_ids: Vec<u16> = h.extensions.iter().map(|e| e.id).collect();
     let sig = ext::sig_algs(&h.extensions);
 
+    // Built from the same walk that produced `ext_ids`, so the two stay parallel.
+    let provenance = Provenance {
+        ciphers: h.cipher_span,
+        extensions: h.extensions_span,
+        per_extension: h.extensions.iter().map(|e| (e.id, e.span)).collect(),
+    };
+
     let ja3_string = crate::ja3::ja3_string(
         h.legacy_version,
         &h.ciphers,
@@ -179,6 +201,7 @@ pub fn fingerprint(raw: &[u8]) -> Result<TlsFingerprint, ParseError> {
         has_sni: ext::has_sni(&h.extensions),
         ciphers: h.ciphers,
         extensions: ext_ids,
+        provenance,
     })
 }
 
@@ -356,5 +379,85 @@ mod tests {
     fn a_malformed_record_yields_an_error_not_a_fingerprint() {
         assert!(fingerprint(&[0x17, 0x03, 0x03, 0x00, 0x00]).is_err());
         assert!(fingerprint(&[]).is_err());
+    }
+
+    // --- provenance ----------------------------------------------------------
+
+    /// Provenance has to survive the trip through `fingerprint`, which is the only
+    /// entry point the probe uses.
+    #[test]
+    fn the_fingerprint_carries_provenance_for_every_extension_it_reports() {
+        let raw = fixture("chrome-macos");
+        let fp = fingerprint(&raw).expect("fingerprint");
+
+        assert_eq!(
+            fp.provenance.per_extension.len(),
+            fp.extensions.len(),
+            "one span per reported extension"
+        );
+        for (id, _) in &fp.provenance.per_extension {
+            assert!(
+                fp.extensions.contains(id),
+                "ext {id} has a span but is not reported"
+            );
+        }
+    }
+
+    /// The spans must still index the same bytes after passing through
+    /// `fingerprint`, not merely after `parse_hello`.
+    #[test]
+    fn provenance_spans_still_index_the_right_bytes_after_fingerprinting() {
+        let raw = fixture("curl-8.7.1-macos");
+        let fp = fingerprint(&raw).expect("fingerprint");
+        let s = fp.provenance.ciphers;
+        let from_span: Vec<u16> = raw[s.start..s.start + s.len]
+            .chunks_exact(2)
+            .filter_map(|p| Some(u16::from_be_bytes([*p.first()?, *p.get(1)?])))
+            .collect();
+        assert_eq!(from_span, fp.ciphers);
+    }
+
+    /// GREASE positions are reported as indices into the cipher list. A renderer
+    /// has to turn one into a byte range, so the arithmetic is pinned here rather
+    /// than left for the TUI to invent.
+    #[test]
+    fn a_grease_cipher_position_maps_to_a_two_byte_range_inside_the_cipher_span() {
+        let raw = fixture("chrome-macos");
+        let fp = fingerprint(&raw).expect("fingerprint");
+        let pos = *fp
+            .grease_cipher_positions
+            .first()
+            .expect("chrome sends a GREASE cipher");
+
+        let start = fp.provenance.ciphers.start + pos * 2;
+        let value = u16::from_be_bytes([raw[start], raw[start + 1]]);
+        assert!(
+            crate::grease::is_grease(value),
+            "byte range for GREASE position {pos} held {value:#06x}"
+        );
+    }
+
+    /// Same arithmetic for extensions, which a renderer needs in order to mark
+    /// GREASE inside the extension block.
+    #[test]
+    fn a_grease_extension_position_maps_to_that_extensions_span() {
+        let raw = fixture("chrome-macos");
+        let fp = fingerprint(&raw).expect("fingerprint");
+        let pos = *fp
+            .grease_ext_positions
+            .first()
+            .expect("chrome sends GREASE extensions");
+
+        let (id, span) = fp
+            .provenance
+            .per_extension
+            .get(pos)
+            .copied()
+            .expect("a span at the GREASE position");
+        assert!(crate::grease::is_grease(id), "ext at {pos} was {id:#06x}");
+        assert_eq!(
+            u16::from_be_bytes([raw[span.start], raw[span.start + 1]]),
+            id
+        );
     }
 }
