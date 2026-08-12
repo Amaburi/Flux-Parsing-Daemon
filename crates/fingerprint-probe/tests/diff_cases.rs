@@ -231,3 +231,106 @@ fn no_cookie_value_appears_anywhere_in_the_diff_output() {
         "a cookie value would contain '=':\n{text}"
     );
 }
+
+// --- rendering: long lists must stay readable in a terminal ------------------
+
+/// curl offers 49 ciphers. Rendered in full that is a single 300-character line,
+/// which wraps into an unreadable block and buries the fields that actually
+/// differ. The README documented a truncated form long before one existed.
+#[test]
+fn a_long_list_is_truncated_with_an_explicit_count() {
+    let out = diff(&report("curl"), &profile("chrome-macos")).to_string();
+    let line = out
+        .lines()
+        .find(|l| l.contains("ciphers"))
+        .expect("a ciphers line");
+
+    assert!(line.contains("+"), "expected a count marker in: {line}");
+    assert!(line.contains("more"), "expected a count marker in: {line}");
+    assert!(
+        line.starts_with("  \u{2717} ciphers         4867,4866,4865,"),
+        "the head of the list must survive: {line}"
+    );
+}
+
+/// Truncation is a display concern only. Anything reading the diff
+/// programmatically, or asserting against it, must still see every value.
+#[test]
+fn truncation_does_not_touch_the_underlying_values() {
+    let d = diff(&report("curl"), &profile("chrome-macos"));
+    let ciphers = d
+        .fields
+        .iter()
+        .find(|f| f.field == "ciphers")
+        .expect("a ciphers field");
+
+    assert_eq!(ciphers.observed.split(',').count(), 49);
+    assert!(!ciphers.observed.contains("more"));
+}
+
+/// The paired negative. A rule that always truncates would pass the test above
+/// while mangling every short field, so a list that fits must be left alone.
+#[test]
+fn a_short_list_is_left_alone() {
+    let out = diff(&report("curl"), &profile("chrome-macos")).to_string();
+    let line = out
+        .lines()
+        .find(|l| l.contains("SETTINGS"))
+        .expect("a SETTINGS line");
+
+    assert!(line.contains("3:100;4:10485760;2:0"), "{line}");
+    assert!(
+        !line.contains("more"),
+        "a short value was truncated: {line}"
+    );
+}
+
+/// The point of the exercise. Every rendered line has to fit a normal terminal.
+#[test]
+fn no_rendered_line_overflows_a_terminal() {
+    for label in ["chrome-macos", "curl-8.7.1-macos"] {
+        for which in ["curl", "chrome"] {
+            let out = diff(&report(which), &profile(label)).to_string();
+            for line in out.lines() {
+                assert!(
+                    line.chars().count() <= 120,
+                    "{} chars, {label} vs {which}: {line}",
+                    line.chars().count()
+                );
+            }
+        }
+    }
+}
+
+/// Notes are English sentences, and sentences contain commas. A shortener that
+/// treats every comma as a list separator turns "absent entirely, no browser
+/// omits GREASE" into "absent entirely +1 more", which says something different
+/// and is worse than no shortening at all.
+#[test]
+fn a_prose_note_is_never_truncated() {
+    let out = diff(&report("curl"), &profile("chrome-macos")).to_string();
+
+    for expected in [
+        "absent entirely, no browser omits GREASE",
+        "sends id 3, which no browser does",
+    ] {
+        assert!(
+            out.contains(expected),
+            "note was mangled, wanted: {expected}\n{out}"
+        );
+    }
+}
+
+/// The other half. A note that really is a labelled list still gets shortened,
+/// and keeps its label so the line still reads.
+#[test]
+fn a_labelled_list_note_keeps_its_label_and_is_shortened() {
+    let out = diff(&report("curl"), &profile("chrome-macos")).to_string();
+    let line = out
+        .lines()
+        .find(|l| l.contains("missing:"))
+        .expect("a missing: note");
+
+    assert!(line.contains("missing: cache-control"), "{line}");
+    assert!(line.contains("more"), "the list was not shortened: {line}");
+}

@@ -38,18 +38,20 @@ $ fpd check --profile chrome-macos -- curl -sk --http2 '{url}'
 ```
 
 ```
-  ✗ ciphers         4867,4866,4865,…  (chrome-macos: 4865,4866,4867,…)  order rule: Fixed
-  ✗ extensions      43,51,11,10,13,16  (chrome-macos: 23,27,45,…)  order rule: Permuted
+  ✗ ciphers         4867,4866,4865,52393,52392 +44 more  (chrome-macos: 4865,4866,4867,49195,49199 +10 more)
+                    order rule: Fixed
+  ✗ extensions      43,51,11,10,13,16  (chrome-macos: 23,27,45,13,16,18,11,65281,35 +6 more)
+                    order rule: Permuted
   ✗ GREASE          0 cipher, 0 extension  (chrome-macos: 1 cipher, 2 extension)
-                    absent entirely; no browser omits GREASE
+                    absent entirely, no browser omits GREASE
   ✓ ALPN            h2
   ✓ SNI             absent
   ✗ SETTINGS        3:100;4:10485760;2:0  (chrome-macos: 1:65536;2:0;4:6291456;6:262144)
                     sends id 3, which no browser does
   ✗ WINDOW_UPDATE   1048510465  (chrome-macos: 15663105)
   ✗ pseudo-header   m,s,a,p  (chrome-macos: m,a,s,p)
-  ✗ header order    user-agent,accept  (chrome-macos: cache-control,sec-ch-ua,…)
-                    missing: sec-ch-ua, sec-fetch-site, accept-language, priority, …
+  ✗ header order    user-agent,accept  (chrome-macos: cache-control,sec-ch-ua +12 more)
+                    missing: cache-control,sec-ch-ua +10 more
   ✗ accept-language absent  (chrome-macos: present)
   verdict: NOT chrome-macos (20% match)
 ```
@@ -338,7 +340,7 @@ about what a built binary shows or what an acceptance is bound to.
 Canonical terms hash, for verifying that a binary is a genuine build:
 
 ```
-sha256:7084b58c32452f36777b71b33a5fd34ee123e6043fa4cd4ca582b27286c2cb8a
+sha256:143e8d871d94cb826596e0d5a70cf0666662065ac3faa9648c2fa16795b1b0ac
 ```
 
 ```console

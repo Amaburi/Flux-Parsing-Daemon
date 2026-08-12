@@ -64,21 +64,88 @@ impl Diff {
     }
 }
 
+/// How wide a single value may be before it is shortened for display.
+const VALUE_BUDGET: usize = 30;
+
+/// Width of the mark and field-name column, so a note lines up under its value.
+const FIELD_COLUMN: usize = 20;
+
+/// Whether a value is a list of tokens rather than a sentence that happens to
+/// contain a comma.
+///
+/// Notes are English (`absent entirely, no browser omits GREASE`), and treating
+/// their commas as separators produces `absent entirely +1 more`, which means
+/// something else entirely. Items in a real list never contain a space.
+fn is_list(value: &str) -> bool {
+    let items: Vec<&str> = value.split(',').collect();
+    items.len() >= 2 && items.iter().all(|i| !i.is_empty() && !i.contains(' '))
+}
+
+/// Shortens a value for display, keeping whole items and saying how many were
+/// dropped.
+///
+/// curl offers 49 ciphers, which renders as a 300 character line that wraps into
+/// a block and buries the fields that actually differ. Values that are not lists
+/// are returned untouched, because cutting an opaque value corrupts it rather
+/// than shortening it.
+///
+/// Display only. `FieldDiff` keeps every value in full, so anything reading the
+/// diff programmatically still sees all of it.
+fn elide(value: &str) -> String {
+    if value.chars().count() <= VALUE_BUDGET {
+        return value.to_string();
+    }
+
+    // `missing: a,b,c` is a labelled list. Shorten the list, keep the label.
+    if let Some((label, rest)) = value.split_once(": ") {
+        if is_list(rest) {
+            return format!("{label}: {}", elide_list(rest));
+        }
+    }
+
+    if is_list(value) {
+        return elide_list(value);
+    }
+
+    value.to_string()
+}
+
+fn elide_list(value: &str) -> String {
+    let items: Vec<&str> = value.split(',').collect();
+
+    let mut kept = 0;
+    let mut width = 0;
+    for item in &items {
+        let separator = usize::from(kept > 0);
+        let next = width + item.chars().count() + separator;
+        if next > VALUE_BUDGET && kept > 0 {
+            break;
+        }
+        width = next;
+        kept += 1;
+    }
+
+    match items.len() - kept {
+        0 => value.to_string(),
+        dropped => format!("{} +{dropped} more", items[..kept].join(",")),
+    }
+}
+
 impl fmt::Display for Diff {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for d in &self.fields {
             let mark = if d.ok { '✓' } else { '✗' };
             write!(f, "  {mark} {:<16}", d.field)?;
             if d.ok {
-                writeln!(f, "{}", d.observed)?;
+                writeln!(f, "{}", elide(&d.observed))?;
             } else {
-                write!(f, "{}", d.observed)?;
+                write!(f, "{}", elide(&d.observed))?;
                 if !d.expected.is_empty() {
-                    write!(f, "  ({}: {})", self.label, d.expected)?;
+                    write!(f, "  ({}: {})", self.label, elide(&d.expected))?;
                 }
-                match &d.note {
-                    Some(n) => writeln!(f, "  {n}")?,
-                    None => writeln!(f)?,
+                writeln!(f)?;
+                if let Some(n) = &d.note {
+                    writeln!(f, "{:width$}{}", "", elide(n), width = FIELD_COLUMN)?;
                 }
             }
         }
@@ -136,7 +203,7 @@ fn field(name: &str, ok: bool, observed: String, expected: String) -> FieldDiff 
 pub fn diff(report: &ClientReport, profile: &Profile) -> Diff {
     let mut fields = Vec::new();
 
-    // --- TLS ciphers. Fixed even for Chrome; only extensions permute. ---------
+    // --- TLS ciphers. Fixed even for Chrome. Only extensions permute. ---------
     let obs_ciphers = grease::strip(&report.tls.ciphers);
     let ok = compare_ordered(
         &obs_ciphers,
@@ -198,7 +265,7 @@ pub fn diff(report: &ClientReport, profile: &Profile) -> Diff {
         format!("{exp_gc} cipher, {exp_ge} extension"),
     );
     if !ok && obs_gc == 0 && obs_ge == 0 {
-        d.note = Some("absent entirely; no browser omits GREASE".to_string());
+        d.note = Some("absent entirely, no browser omits GREASE".to_string());
     }
     fields.push(d);
 
@@ -270,7 +337,7 @@ pub fn diff(report: &ClientReport, profile: &Profile) -> Diff {
     }
 
     // --- HTTP layer ----------------------------------------------------------
-    // fpd's own design, not JA4H. Only client-identifying fields are compared;
+    // fpd's own design, not JA4H. Only client-identifying fields are compared,
     // method, referer and cookie counts vary between requests from one client and
     // would make a browser fail to match its own profile.
     if let (Some(obs), Some(exp)) = (&report.h2, &profile.http) {
