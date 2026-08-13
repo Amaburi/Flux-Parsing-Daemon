@@ -43,8 +43,16 @@ pub enum Command {
         #[arg(long)]
         admin_socket: Option<String>,
     },
-    /// Live fingerprint dashboard  (M6)
-    Tui,
+    /// Live fingerprint dashboard
+    Tui {
+        /// Watch a running `fpd serve` through its admin socket. Unix only.
+        #[arg(long)]
+        attach: Option<String>,
+        /// Bind an own listener instead, so nothing else has to be running.
+        /// Captures and closes, it does not proxy.
+        #[arg(long)]
+        listen: Option<String>,
+    },
     /// Check a client against a browser profile
     Check {
         /// Profile to compare against. Omit to identify the client instead.

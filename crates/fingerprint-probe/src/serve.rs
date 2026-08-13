@@ -98,6 +98,20 @@ pub async fn forward(
 ) -> Response<ProxyBody> {
     let (mut parts, body) = req.into_parts();
 
+    // HTTP/2 carries the target as `:scheme` plus `:authority` plus `:path`, and
+    // hyper reassembles those into an absolute URL. An HTTP/1.1 origin server
+    // expects origin-form and reads an absolute URL as a literal filename, so
+    // forwarding it unchanged 404s every h2 request at the upstream. nginx
+    // tolerates the absolute form, which is why this went unnoticed until it met
+    // `python3 -m http.server`.
+    //
+    // A request that is already origin-form passes through untouched.
+    if let Some(path_and_query) = parts.uri.path_and_query().cloned() {
+        if let Ok(origin_form) = hyper::Uri::builder().path_and_query(path_and_query).build() {
+            parts.uri = origin_form;
+        }
+    }
+
     // Strip anything the client sent under our prefix, then attach the real values.
     let mut names: Vec<(String, String)> = parts
         .headers

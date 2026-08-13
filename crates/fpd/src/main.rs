@@ -2,6 +2,7 @@
 
 mod cli;
 mod commands;
+mod tui;
 
 use clap::Parser;
 use std::process::ExitCode;
@@ -64,7 +65,10 @@ fn main() -> ExitCode {
             });
             return ExitCode::from(code);
         }
-        Some(cli::Command::Tui) => println!("tui: not yet implemented (M6)"),
+        Some(cli::Command::Tui { attach, listen }) => {
+            let code = commands::tui::run(commands::tui::Args { attach, listen });
+            return ExitCode::from(code);
+        }
         Some(cli::Command::Check {
             profile,
             timeout,

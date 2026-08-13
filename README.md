@@ -25,7 +25,7 @@ In development. What works today:
 | `fpd serve` | **Working.** Reverse proxy that annotates traffic for any upstream. |
 | `fingerprint-tower` | **Working.** Embedded in a Rust app, no proxy and no extra hop. |
 | `fpd emulate --verify` | **Working.** Reproduces a profile across TLS and HTTP/2, and proves it. |
-| `tui` | Not implemented. Stub. |
+| `fpd tui` | **Working.** Live view showing which bytes produced each fingerprint. |
 
 Every fingerprint value is checked against tshark rather than against itself. See
 [the design](docs/design/2026-08-11-fpd-design.md) and [the plans](docs/plans/).
@@ -286,6 +286,73 @@ The JSON shape is **not a stable interface** yet. It exists to be inspected and 
 
 Unix only. On other platforms the flag is accepted and reported as unsupported rather
 than silently doing nothing.
+
+## Watching it live
+
+`fpd tui` shows connections as they arrive, and for the selected one, **which bytes
+produced its fingerprint**.
+
+```console
+$ fpd tui --listen 127.0.0.1:8443       # binds its own listener, nothing else needed
+$ fpd tui --attach /run/fpd.sock        # watches a running `fpd serve`
+```
+
+```
+fpd   :8443   3 conn   1 alert
+
+09:44:31   45.9.148.10      t13i4906h2_0d8feac7bc37_7395dae3b2f3    chrome-macos
+09:44:33   45.9.148.11      t13i4906h2_0d8feac7bc37_7395dae3b2f3    curl-8.7.1-macos  ✗
+09:44:35   45.9.148.12      t13i4906h2_0d8feac7bc37_7395dae3b2f3    firefox-133
+──────────────────────────────────────────────────────────────────────────────────
+45.9.148.11         curl-8.7.1-macos  94%
+  the user-agent claims a browser this fingerprint contradicts
+ja4    t13i4906h2_0d8feac7bc37_7395dae3b2f3
+       49 ciphers, 6 extensions, alpn h2
+h2     3:100;4:10485760;2:0|1048510465|0|m,s,a,p
+
+clienthello   301 bytes
+
+0030   ·· ·· ·· ·· ·· ·· ·· ··  ·· ·· ·· ·· ·· ·· ·· ··
+0040   ·· ·· ·· ·· ·· ·· ·· ··  ·· ·· ·· ·· ·· ·· 13 03   ciphers 49
+0050   13 02 13 01 cc a9 cc a8  cc aa c0 30 c0 2c c0 28
+0060   c0 24 c0 14 c0 0a 00 9f  00 6b 00 39 ff 85 00 c4
+00b0   ·· ·· ·· ·· 00 2b 00 09  08 03 04 03 03 03 02 03   extensions 6
+
+──────────────────────────────────────────────────────────────────────────────────
+/  search       f  follow       e  export       q  quit
+```
+
+The `··` are bytes that do not feed the fingerprint, the random field and the session
+id. They render recessed, and everything that does feed it renders at full weight. **The
+fingerprint's shape appears in the dump as contrast**, so you can see the cipher block
+begin at 0x3e and the extensions at 0xb4 without anything pointing at them.
+
+`e` writes the selected ClientHello to a file, so it can be handed to `tshark` or kept
+as a test fixture. The bytes are the evidence, so that is what gets exported.
+
+### One ink
+
+The whole interface is a single colour, the terminal's own default foreground.
+Hierarchy comes from weight and inversion rather than hue, the way it does in print.
+Recessed for chrome and inert bytes, normal for data, bold for focus, inverted for the
+selected row and for a mismatch.
+
+Nothing here is a palette, which is the point. It follows that the view is identical
+under `NO_COLOR` because there was never colour to remove, that colour vision deficiency
+does not affect it, and that it reads correctly on a light terminal and a dark one with
+no second code path. Those are not features that were added. They are what is left when
+nothing is decorated.
+
+A test scans every cell of a rendered frame at five terminal sizes and fails if any of
+them carries a colour, so this cannot drift.
+
+The layout has stated breakpoints rather than emergent ones: 16 bytes per hex row at 100
+columns or wider, 8 down to 72, and below that the hex pane is hidden rather than
+squeezed. A view that corrupts its own frame at some width is not finished.
+
+`--listen` captures and closes. There is no upstream to forward to, so a client sees the
+connection end after its request. It is for inspecting a client, not for serving one.
+Use `--attach` against a real `fpd serve` for anything in front of an application.
 
 ### Rust applications need no proxy at all
 

@@ -67,16 +67,18 @@ async fn stub_upstream(seen: Seen) -> SocketAddr {
                 let svc = hyper::service::service_fn(move |req: Request<hyper::body::Incoming>| {
                     let seen = seen.clone();
                     async move {
-                        let headers: RequestHeaders = req
-                            .headers()
-                            .iter()
-                            .map(|(n, v)| {
-                                (
-                                    n.as_str().to_string(),
-                                    String::from_utf8_lossy(v.as_bytes()).into_owned(),
-                                )
-                            })
-                            .collect();
+                        // The request target is recorded alongside the headers,
+                        // under the HTTP/2 pseudo-header name. Recording only
+                        // headers is what let an absolute-form target reach the
+                        // upstream unnoticed through every test in this file.
+                        let mut headers: RequestHeaders =
+                            vec![(":path".to_string(), req.uri().to_string())];
+                        headers.extend(req.headers().iter().map(|(n, v)| {
+                            (
+                                n.as_str().to_string(),
+                                String::from_utf8_lossy(v.as_bytes()).into_owned(),
+                            )
+                        }));
                         if let Ok(mut g) = seen.0.lock() {
                             g.push(headers);
                         }
@@ -376,4 +378,38 @@ async fn no_admin_socket_exists_unless_the_flag_is_given() {
         !sock.exists(),
         "a socket was created without --admin-socket"
     );
+}
+
+/// HTTP/2 carries the target as `:scheme` plus `:authority` plus `:path`, and
+/// hyper reassembles those into an absolute URL. An HTTP/1.1 origin server
+/// expects origin-form and treats an absolute URL as a literal path, so
+/// forwarding it unchanged makes every request 404 at the upstream.
+///
+/// Found by running the proxy against `python3 -m http.server`, not by any test
+/// here, because the stub upstream recorded only headers. nginx tolerates the
+/// absolute form, which is exactly why this is worth pinning.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_upstream_receives_an_origin_form_target_not_an_absolute_url() {
+    if !curl_available() {
+        eprintln!("curl not available, skipping");
+        return;
+    }
+    let seen = through_serve(&[]).await;
+    assert_eq!(
+        seen.header(":path").as_deref(),
+        Some("/"),
+        "an origin server reads an absolute URL as a filename and 404s"
+    );
+}
+
+/// The same for HTTP/1.1, where the client already sends origin-form. Rewriting
+/// must not corrupt what was already correct.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_http1_request_target_reaches_the_upstream_unchanged() {
+    if !curl_available() {
+        eprintln!("curl not available, skipping");
+        return;
+    }
+    let seen = through_serve(&["--http1.1"]).await;
+    assert_eq!(seen.header(":path").as_deref(), Some("/"));
 }
